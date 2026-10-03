@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "2026-10-03",
+  "catalogVersion": "2026-10-03.1",
   "language": "fr",
   "games": [
     {
@@ -32,6 +32,16 @@
       },
       "path": "games/relais-chronometre.json",
       "icon": "stopwatch"
+    },
+    {
+      "id": "scrabble",
+      "name": "Scrabble",
+      "players": {
+        "min": 2,
+        "max": 4
+      },
+      "path": "games/scrabble.json",
+      "minimumAge": 10
     }
   ]
 }

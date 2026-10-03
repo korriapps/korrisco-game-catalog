@@ -14,7 +14,9 @@ Catalogue public officiel de configurations de jeux pour KorriSco. Ce dépôt es
 
 Les identifiants sont en lowercase kebab-case ASCII, par exemple `relais-chronometre`. Les chemins sont relatifs et les configurations détaillées utilisent `schemaVersion: 1`. Les propriétés additives inconnues restent autorisées ; `scoreStep` est explicitement interdit.
 
-`catalogVersion` est une chaîne opaque. Elle doit changer lorsqu’une modification de contenu publié doit pouvoir être identifiée par le client. Pour V1, une date ISO `YYYY-MM-DD` convient ; aucune comparaison SemVer n’est définie.
+Les manches se configurent de trois façons : `rounds.enabled: false` signifie qu’il n’y a pas de manches ; `rounds.enabled: true` avec un entier `count` de 2 à 99 définit un nombre fixe ; `rounds.enabled: true` avec `count: null` indique que les tours sont ajoutés progressivement pendant la partie.
+
+`catalogVersion` est une chaîne opaque. Elle doit changer lorsqu’une modification de contenu publié doit pouvoir être identifiée par le client. La première version publiée d’un jour utilise `YYYY-MM-DD`, puis les mises à jour supplémentaires du même jour utilisent un suffixe ordinal, par exemple `2026-10-03.1`, puis `2026-10-03.2`. Aucune comparaison SemVer n’est définie.
 
 ## Ajouter un jeu
 

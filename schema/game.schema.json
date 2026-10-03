@@ -123,9 +123,16 @@
           "type": "boolean"
         },
         "count": {
-          "type": "integer",
-          "minimum": 2,
-          "maximum": 99
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 99
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "allOf": [

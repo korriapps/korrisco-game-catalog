@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "scrabble",
+  "name": "Scrabble",
+  "players": {
+    "min": 2,
+    "max": 4
+  },
+  "minimumAge": 10,
+  "result": {
+    "type": "score",
+    "winner": "highest"
+  },
+  "rounds": {
+    "enabled": true,
+    "count": null
+  },
+  "playMode": "individual",
+  "rules": "À chaque tour, saisissez le score réalisé par chaque joueur. Le total le plus élevé à la fin de la partie gagne."
+}
