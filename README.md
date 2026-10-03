@@ -22,7 +22,7 @@ Les manches se configurent de trois façons : `rounds.enabled: false` signifie q
 
 1. Créer `games/<id>.json` avec un identifiant lowercase kebab-case.
 2. Ajouter l’entrée correspondante dans `catalog.json`, avec `id`, `name`, `players` et `path: "games/<id>.json"`.
-3. Ajouter éventuellement une illustration originale dans `images/<id>.webp` et le champ `image`. La convention recommandée est un carré 1:1, 256×256 pixels, en WebP.
+3. Ajouter éventuellement une illustration originale dans `images/<id>.webp` et référencer exactement ce même chemin dans `catalog.json` et `games/<id>.json`. Le fichier doit être un WebP de 256×256 pixels et peser au maximum 100 Ko ; une taille inférieure à 50 Ko est recommandée. L’image est facultative : l’application utilise son fallback lorsqu’elle est absente. Les images source haute définition ne sont pas destinées à être distribuées directement par le Catalogue. Le Catalogue est strict pour les nouvelles images WebP, tandis que l’application reste tolérante et peut lire les anciens PNG/JPEG.
 4. Mettre à jour `catalogVersion` si le contenu publié change.
 5. Lancer `python -m pip install -r requirements.txt`, puis `python scripts/validate_catalog.py`.
 

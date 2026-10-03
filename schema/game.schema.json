@@ -32,7 +32,7 @@
     },
     "image": {
       "type": "string",
-      "minLength": 1
+      "pattern": "^images/[a-z0-9]+(?:-[a-z0-9]+)*\\.webp$"
     },
     "players": {
       "type": "object",

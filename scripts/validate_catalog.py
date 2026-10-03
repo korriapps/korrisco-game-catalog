@@ -9,6 +9,8 @@ import sys
 from pathlib import Path
 from urllib.parse import urlparse
 
+from PIL import Image
+from PIL import UnidentifiedImageError
 from jsonschema import Draft202012Validator
 
 
@@ -47,6 +49,32 @@ def validate_relative_path(value: object, *, field: str, prefix: str) -> Path:
     return ROOT / value
 
 
+def validate_image(value: object, *, game_id: str, field: str) -> Path:
+    expected = f"images/{game_id}.webp"
+    image_path = validate_relative_path(value, field=field, prefix="images/")
+    if value != expected:
+        fail(field, f"must equal {expected}")
+    if not image_path.is_file():
+        fail(field, f"file does not exist: {value}")
+    size = image_path.stat().st_size
+    if size > 100 * 1024:
+        fail(field, f"file is too large ({size} bytes; maximum is 102400)")
+    try:
+        with Image.open(image_path) as image:
+            detected_format = image.format
+            image.verify()
+        with Image.open(image_path) as image:
+            image.load()
+            dimensions = image.size
+    except (OSError, SyntaxError, UnidentifiedImageError) as exc:
+        fail(field, f"file is not a decodable WebP image ({exc})")
+    if detected_format != "WEBP":
+        fail(field, f"file format must be WebP, detected {detected_format or 'unknown'}")
+    if dimensions != (256, 256):
+        fail(field, f"image dimensions must be 256x256, got {dimensions[0]}x{dimensions[1]}")
+    return image_path.resolve()
+
+
 def validate_catalog(catalog: dict, schema: dict) -> None:
     if catalog.get("schemaVersion") != 1:
         fail("catalog.json.schemaVersion", "must equal 1")
@@ -61,6 +89,7 @@ def validate_catalog(catalog: dict, schema: dict) -> None:
     ids: set[str] = set()
     paths: set[str] = set()
     referenced_paths: set[Path] = set()
+    referenced_image_paths: set[Path] = set()
 
     for index, entry in enumerate(games):
         entry_path = f"catalog.json.games[{index}]"
@@ -98,11 +127,6 @@ def validate_catalog(catalog: dict, schema: dict) -> None:
             not isinstance(entry["minimumAge"], int) or entry["minimumAge"] < 0
         ):
             fail(f"{entry_path}.minimumAge", "must be an integer >= 0")
-        if "image" in entry:
-            image_path = validate_relative_path(entry["image"], field=f"{entry_path}.image", prefix="images/")
-            if not image_path.is_file():
-                fail(f"{entry_path}.image", f"file does not exist: {entry['image']}")
-
         detail = load_json(path)
         errors = sorted(Draft202012Validator(schema).iter_errors(detail), key=lambda error: list(error.path))
         if errors:
@@ -114,15 +138,29 @@ def validate_catalog(catalog: dict, schema: dict) -> None:
         detail_players = detail.get("players", {})
         if detail_players.get("max") is not None and detail_players["max"] < detail_players["min"]:
             fail(str(path.relative_to(ROOT)), "players.max must be >= players.min")
-        image = detail.get("image")
-        if image is not None:
-            image_path = validate_relative_path(image, field=f"{path.relative_to(ROOT)}.image", prefix="images/")
-            if not image_path.is_file():
-                fail(f"{path.relative_to(ROOT)}.image", f"file does not exist: {image}")
+        index_image = entry.get("image")
+        detail_image = detail.get("image")
+        if (index_image is None) != (detail_image is None):
+            fail(
+                f"{path.relative_to(ROOT)}.image",
+                "image must be declared identically in catalog.json and the game detail",
+            )
+        if index_image is not None and index_image != detail_image:
+            fail(
+                f"{path.relative_to(ROOT)}.image",
+                "image path differs between catalog.json and the game detail",
+            )
+        if index_image is not None:
+            referenced_image_paths.add(
+                validate_image(index_image, game_id=game_id, field=f"{entry_path}.image")
+            )
 
     for orphan in sorted((ROOT / "games").glob("*.json")) if (ROOT / "games").is_dir() else []:
         if orphan.resolve() not in referenced_paths:
             fail(str(orphan.relative_to(ROOT)), "orphan game file is not referenced by catalog.json")
+    for orphan in sorted((ROOT / "images").glob("*.webp")) if (ROOT / "images").is_dir() else []:
+        if orphan.resolve() not in referenced_image_paths:
+            fail(str(orphan.relative_to(ROOT)), "orphan WebP image is not referenced by catalog.json")
 
 
 def main() -> int:
