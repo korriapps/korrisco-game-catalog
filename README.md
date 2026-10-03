@@ -30,6 +30,22 @@ Les illustrations doivent être originales ou utilisées avec les droits/licence
 
 Les contributions passent par une pull request. La CI vérifie les JSON, le schéma, les chemins, les doublons, les fichiers orphelins, les images référencées et la cohérence entre index et détail.
 
+## Préparer une illustration
+
+Les mainteneurs peuvent préparer une source PNG, JPEG ou WebP carrée avec Pillow avant publication :
+
+```sh
+python scripts/prepare_image.py ~/Desktop/scrabble.png scrabble
+```
+
+Le script crée `images/scrabble.webp` en 256×256 pixels, avec une taille maximale de 100 Ko. Il vise une taille inférieure à 50 Ko, conserve la source intacte et refuse les sources non carrées ou plus petites que 256×256. Une destination existante est refusée par défaut ; utiliser `--force` pour la remplacer explicitement :
+
+```sh
+python scripts/prepare_image.py ~/Desktop/scrabble.png scrabble --force
+```
+
+Cette préparation ne modifie ni `catalog.json`, ni `games/<id>.json`, ni `catalogVersion`. Après vérification du rendu, ajouter explicitement la même référence `images/<id>.webp` dans les deux JSON et mettre à jour `catalogVersion` lors de la publication réelle. Conserver les sources haute définition hors des fichiers distribués.
+
 ## Validation locale
 
 ```sh
