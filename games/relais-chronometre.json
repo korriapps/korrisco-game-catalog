@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "relais-chronometre",
+  "name": "Relais chronométré",
+  "players": {
+    "min": 2,
+    "max": null
+  },
+  "result": {
+    "type": "time",
+    "winner": "shortest"
+  },
+  "rounds": {
+    "enabled": false
+  },
+  "playMode": "teams",
+  "rules": "Chaque équipe réalise le relais. Le temps total le plus court gagne."
+}

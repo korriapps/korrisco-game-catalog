@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "duel",
+  "name": "Duel",
+  "players": {
+    "min": 2,
+    "max": 2
+  },
+  "result": {
+    "type": "winLoss",
+    "allowMultipleWinners": false
+  },
+  "rounds": {
+    "enabled": false
+  },
+  "playMode": "individual",
+  "rules": "Le vainqueur est le joueur qui remporte le duel."
+}

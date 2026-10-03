@@ -1,19 +1,38 @@
 # KorriSco Game Catalog
 
-Official public game configuration catalog for KorriSco.
-
-This repository contains:
-- the game catalog index;
-- individual game configurations;
-- game illustrations;
-- the JSON schema used to validate catalog contributions.
+Catalogue public officiel de configurations de jeux pour KorriSco. Ce dépôt est autonome : l’application Flutter le consomme en lecture seule, puis chaque jeu importé devient une copie locale indépendante.
 
 ## Structure
 
-- `catalog.json` — catalog index
-- `games/` — individual game configurations
-- `images/` — game illustrations
-- `schema/` — JSON schema definitions
+- `catalog.json` — index public et métadonnées utilisées par la liste ;
+- `games/` — une configuration JSON détaillée par jeu ;
+- `images/` — illustrations optionnelles (aucune image n’est requise pour les fixtures actuelles) ;
+- `schema/game.schema.json` — contrat JSON Schema Draft 2020-12 des configurations ;
+- `scripts/validate_catalog.py` — validation de l’index, des fichiers et des règles entre champs.
 
-The catalog is consumed by KorriSco as a read-only public resource.
-Imported games become independent local copies in the application.
+## Format V1
+
+Les identifiants sont en lowercase kebab-case ASCII, par exemple `relais-chronometre`. Les chemins sont relatifs et les configurations détaillées utilisent `schemaVersion: 1`. Les propriétés additives inconnues restent autorisées ; `scoreStep` est explicitement interdit.
+
+`catalogVersion` est une chaîne opaque. Elle doit changer lorsqu’une modification de contenu publié doit pouvoir être identifiée par le client. Pour V1, une date ISO `YYYY-MM-DD` convient ; aucune comparaison SemVer n’est définie.
+
+## Ajouter un jeu
+
+1. Créer `games/<id>.json` avec un identifiant lowercase kebab-case.
+2. Ajouter l’entrée correspondante dans `catalog.json`, avec `id`, `name`, `players` et `path: "games/<id>.json"`.
+3. Ajouter éventuellement une illustration originale dans `images/<id>.webp` et le champ `image`. La convention recommandée est un carré 1:1, 256×256 pixels, en WebP.
+4. Mettre à jour `catalogVersion` si le contenu publié change.
+5. Lancer `python -m pip install -r requirements.txt`, puis `python scripts/validate_catalog.py`.
+
+Les illustrations doivent être originales ou utilisées avec les droits/licences appropriés. Ne pas copier les visuels commerciaux officiels ni reproduire intégralement les règles d’un éditeur ; les descriptions doivent rester originales et concises. N’ajouter aucun secret ni token.
+
+Les contributions passent par une pull request. La CI vérifie les JSON, le schéma, les chemins, les doublons, les fichiers orphelins, les images référencées et la cohérence entre index et détail.
+
+## Validation locale
+
+```sh
+python -m pip install -r requirements.txt
+python scripts/validate_catalog.py
+```
+
+La validation ne nécessite ni Flutter, ni Dart, ni service réseau.

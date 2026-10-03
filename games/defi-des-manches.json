@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "defi-des-manches",
+  "name": "Défi des manches",
+  "players": {
+    "min": 2,
+    "max": 8
+  },
+  "result": {
+    "type": "score",
+    "winner": "highest"
+  },
+  "rounds": {
+    "enabled": true,
+    "count": 5
+  },
+  "playMode": "individual",
+  "rules": "À chaque manche, notez le score de chaque joueur. Le total le plus élevé gagne."
+}

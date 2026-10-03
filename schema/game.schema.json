@@ -1,1 +1,220 @@
-
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://catalog.korrisco.example/schema/game.schema.json",
+  "title": "KorriSco V1 game configuration",
+  "description": "Schema for one public KorriSco game configuration. Unknown additive metadata is allowed.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "id",
+    "name",
+    "players",
+    "result",
+    "rounds",
+    "playMode",
+    "rules"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "icon": {
+      "type": "string",
+      "minLength": 1
+    },
+    "image": {
+      "type": "string",
+      "minLength": 1
+    },
+    "players": {
+      "type": "object",
+      "required": ["min", "max"],
+      "properties": {
+        "min": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "minimumAge": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "result": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "enum": ["score", "winLoss", "time"]
+        },
+        "winner": {
+          "enum": ["highest", "lowest", "shortest", "longest"]
+        },
+        "allowMultipleWinners": {
+          "type": "boolean"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {"const": "score"}
+            }
+          },
+          "then": {
+            "required": ["winner"],
+            "properties": {
+              "winner": {"enum": ["highest", "lowest"]}
+            },
+            "not": {"required": ["allowMultipleWinners"]}
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {"const": "time"}
+            }
+          },
+          "then": {
+            "required": ["winner"],
+            "properties": {
+              "winner": {"enum": ["shortest", "longest"]}
+            },
+            "not": {"required": ["allowMultipleWinners"]}
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {"const": "winLoss"}
+            }
+          },
+          "then": {
+            "required": ["allowMultipleWinners"],
+            "not": {"required": ["winner"]}
+          }
+        }
+      ]
+    },
+    "rounds": {
+      "type": "object",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 99
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"enabled": {"const": true}}
+          },
+          "then": {
+            "required": ["count"]
+          }
+        },
+        {
+          "if": {
+            "properties": {"enabled": {"const": false}}
+          },
+          "then": {
+            "not": {"required": ["count"]}
+          }
+        }
+      ]
+    },
+    "playMode": {
+      "enum": ["individual", "teams"]
+    },
+    "rules": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "result": {
+            "properties": {"type": {"const": "score"}}
+          },
+          "rounds": {
+            "properties": {"enabled": {"const": true}}
+          }
+        }
+      },
+      "then": {},
+      "else": {
+        "if": {
+          "properties": {
+            "rounds": {
+              "properties": {"enabled": {"const": true}}
+            }
+          }
+        },
+        "then": false
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "result": {"properties": {"type": {"const": "time"}}}
+        }
+      },
+      "then": {
+        "properties": {
+          "rounds": {"properties": {"enabled": {"const": false}}}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "result": {"properties": {"type": {"const": "winLoss"}}}
+        }
+      },
+      "then": {
+        "properties": {
+          "rounds": {"properties": {"enabled": {"const": false}}}
+        }
+      }
+    },
+    {
+      "not": {"required": ["scoreStep"]}
+    },
+    {
+      "if": {
+        "properties": {"result": {"type": "object"}}
+      },
+      "then": {
+        "properties": {
+          "result": {"not": {"required": ["scoreStep"]}}
+        }
+      }
+    }
+  ]
+}

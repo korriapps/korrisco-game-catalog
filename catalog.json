@@ -1,1 +1,37 @@
-
+{
+  "schemaVersion": 1,
+  "catalogVersion": "2026-10-03",
+  "language": "fr",
+  "games": [
+    {
+      "id": "defi-des-manches",
+      "name": "Défi des manches",
+      "players": {
+        "min": 2,
+        "max": 8
+      },
+      "path": "games/defi-des-manches.json",
+      "icon": "trophy"
+    },
+    {
+      "id": "duel",
+      "name": "Duel",
+      "players": {
+        "min": 2,
+        "max": 2
+      },
+      "path": "games/duel.json",
+      "icon": "crossed-swords"
+    },
+    {
+      "id": "relais-chronometre",
+      "name": "Relais chronométré",
+      "players": {
+        "min": 2,
+        "max": null
+      },
+      "path": "games/relais-chronometre.json",
+      "icon": "stopwatch"
+    }
+  ]
+}
