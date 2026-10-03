@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "2026-10-03.1",
+  "catalogVersion": "2026-10-03.2",
   "language": "fr",
   "games": [
     {
@@ -21,7 +21,7 @@
         "max": 2
       },
       "path": "games/duel.json",
-      "icon": "crossed-swords"
+      "icon": "combat"
     },
     {
       "id": "relais-chronometre",
