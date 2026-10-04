@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "2026-10-03.2",
+  "catalogVersion": "2026-10-04.1",
   "language": "fr",
   "games": [
     {
@@ -41,6 +41,7 @@
         "max": 4
       },
       "path": "games/scrabble.json",
+      "image": "images/scrabble.webp",
       "minimumAge": 10
     }
   ]

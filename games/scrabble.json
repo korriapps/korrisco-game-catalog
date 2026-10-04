@@ -15,6 +15,7 @@
     "enabled": true,
     "count": null
   },
+  "image": "images/scrabble.webp",
   "playMode": "individual",
   "rules": "À chaque tour, saisissez le score réalisé par chaque joueur. Le total le plus élevé à la fin de la partie gagne."
 }
