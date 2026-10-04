@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CATALOG_PATH = ROOT / "catalog.json"
 SCHEMA_PATH = ROOT / "schema" / "game.schema.json"
 ID_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+CATALOG_ENTRY_ALLOWED_FIELDS = frozenset({"id", "name", "path", "icon", "image"})
 
 
 class ValidationFailure(Exception):
@@ -95,7 +96,10 @@ def validate_catalog(catalog: dict, schema: dict) -> None:
         entry_path = f"catalog.json.games[{index}]"
         if not isinstance(entry, dict):
             fail(entry_path, "must be an object")
-        for required in ("id", "name", "players", "path"):
+        unknown_fields = sorted(set(entry) - CATALOG_ENTRY_ALLOWED_FIELDS)
+        if unknown_fields:
+            fail(entry_path, f"contains non-index properties: {', '.join(unknown_fields)}")
+        for required in ("id", "name", "path"):
             if required not in entry:
                 fail(entry_path, f"missing required field {required}")
         game_id = entry["id"]
@@ -106,12 +110,6 @@ def validate_catalog(catalog: dict, schema: dict) -> None:
         ids.add(game_id)
         if not isinstance(entry["name"], str) or not entry["name"].strip():
             fail(f"{entry_path}.name", "must be a non-empty string")
-        players = entry["players"]
-        if not isinstance(players, dict) or not isinstance(players.get("min"), int) or players["min"] < 1:
-            fail(f"{entry_path}.players", "min must be an integer >= 1")
-        maximum = players.get("max")
-        if maximum is not None and (not isinstance(maximum, int) or maximum < players["min"]):
-            fail(f"{entry_path}.players.max", "must be null or an integer >= min")
         path = validate_relative_path(entry["path"], field=f"{entry_path}.path", prefix="games/")
         if entry["path"] in paths:
             fail(f"{entry_path}.path", "duplicate catalog path")
@@ -123,10 +121,6 @@ def validate_catalog(catalog: dict, schema: dict) -> None:
             fail(f"{entry_path}.path", "filename must be games/<id>.json")
         if "icon" in entry and (not isinstance(entry["icon"], str) or not entry["icon"].strip()):
             fail(f"{entry_path}.icon", "must be a non-empty string")
-        if "minimumAge" in entry and (
-            not isinstance(entry["minimumAge"], int) or entry["minimumAge"] < 0
-        ):
-            fail(f"{entry_path}.minimumAge", "must be an integer >= 0")
         detail = load_json(path)
         errors = sorted(Draft202012Validator(schema).iter_errors(detail), key=lambda error: list(error.path))
         if errors:
@@ -135,6 +129,11 @@ def validate_catalog(catalog: dict, schema: dict) -> None:
             fail(str(path.relative_to(ROOT)), f"schema error at {location}: {error.message}")
         if detail.get("id") != game_id:
             fail(str(path.relative_to(ROOT)), f"id {detail.get('id')!r} does not match catalog id {game_id!r}")
+        if detail.get("name") != entry["name"]:
+            fail(
+                str(path.relative_to(ROOT)),
+                f"name differs from catalog entry: index={entry['name']!r}, detail={detail.get('name')!r}",
+            )
         detail_players = detail.get("players", {})
         if detail_players.get("max") is not None and detail_players["max"] < detail_players["min"]:
             fail(str(path.relative_to(ROOT)), "players.max must be >= players.min")

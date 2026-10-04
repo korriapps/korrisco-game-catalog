@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "scrabble",
-  "name": "ScrabbleTEST",
+  "name": "Scrabble",
   "players": {
     "min": 2,
     "max": 4

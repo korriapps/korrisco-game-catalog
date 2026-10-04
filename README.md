@@ -18,10 +18,12 @@ Les manches se configurent de trois façons : `rounds.enabled: false` signifie q
 
 `catalogVersion` est une chaîne opaque. Elle doit changer lorsqu’une modification de contenu publié doit pouvoir être identifiée par le client. La première version publiée d’un jour utilise `YYYY-MM-DD`, puis les mises à jour supplémentaires du même jour utilisent un suffixe ordinal, par exemple `2026-10-03.1`, puis `2026-10-03.2`. Aucune comparaison SemVer n’est définie.
 
+`catalog.json` est un index minimal : chaque entrée autorise uniquement `id`, `name`, `path`, ainsi que `icon` et `image` facultatifs. Les contraintes de joueurs, l’âge minimum et toutes les autres propriétés fonctionnelles servent à la configuration/import et restent exclusivement dans `games/<id>.json`, qui est la source de vérité fonctionnelle. Cette séparation évite les duplications et les divergences, garde l’index léger et permet de charger la configuration complète uniquement lors de la sélection. `image` est volontairement dupliquée lorsqu’elle existe : l’index permet de charger l’illustration à la demande avant le détail, et le validateur impose une référence identique.
+
 ## Ajouter un jeu
 
 1. Créer `games/<id>.json` avec un identifiant lowercase kebab-case.
-2. Ajouter l’entrée correspondante dans `catalog.json`, avec `id`, `name`, `players` et `path: "games/<id>.json"`.
+2. Ajouter l’entrée correspondante dans `catalog.json`, avec `id`, `name` et `path: "games/<id>.json"`, plus seulement les métadonnées nécessaires à l’index (`icon` ou `image` si elles sont publiées).
 3. Ajouter éventuellement une illustration originale dans `images/<id>.webp` et référencer exactement ce même chemin dans `catalog.json` et `games/<id>.json`. Le fichier doit être un WebP de 256×256 pixels et peser au maximum 100 Ko ; une taille inférieure à 50 Ko est recommandée. L’image est facultative : l’application utilise son fallback lorsqu’elle est absente. Les images source haute définition ne sont pas destinées à être distribuées directement par le Catalogue. Le Catalogue est strict pour les nouvelles images WebP, tandis que l’application reste tolérante et peut lire les anciens PNG/JPEG.
 4. Mettre à jour `catalogVersion` si le contenu publié change.
 5. Lancer `python -m pip install -r requirements.txt`, puis `python scripts/validate_catalog.py`.

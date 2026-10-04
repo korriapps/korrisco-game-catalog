@@ -1,48 +1,31 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "2026-10-04.1",
+  "catalogVersion": "2026-10-04.2",
   "language": "fr",
   "games": [
     {
       "id": "defi-des-manches",
       "name": "Défi des manches",
-      "players": {
-        "min": 2,
-        "max": 8
-      },
       "path": "games/defi-des-manches.json",
       "icon": "trophy"
     },
     {
       "id": "duel",
       "name": "Duel",
-      "players": {
-        "min": 2,
-        "max": 2
-      },
       "path": "games/duel.json",
       "icon": "combat"
     },
     {
       "id": "relais-chronometre",
       "name": "Relais chronométré",
-      "players": {
-        "min": 2,
-        "max": null
-      },
       "path": "games/relais-chronometre.json",
       "icon": "stopwatch"
     },
     {
       "id": "scrabble",
-      "name": "ScrabbleTEST",
-      "players": {
-        "min": 2,
-        "max": 4
-      },
+      "name": "Scrabble",
       "path": "games/scrabble.json",
-      "image": "images/scrabble.webp",
-      "minimumAge": 10
+      "image": "images/scrabble.webp"
     }
   ]
 }

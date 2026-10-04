@@ -34,12 +34,11 @@ class CatalogValidationTests(unittest.TestCase):
         validate_catalog.SCHEMA_PATH = self.original_schema_path
         self.tempdir.cleanup()
 
-    def write_catalog(self, index_image=None, detail_image=None, games=None):
+    def write_catalog(self, index_image=None, detail_image=None, detail_name=None, games=None):
         games = games or [
             {
                 "id": "test-game",
                 "name": "Test game",
-                "players": {"min": 2, "max": 4},
                 "path": "games/test-game.json",
             }
         ]
@@ -48,8 +47,8 @@ class CatalogValidationTests(unittest.TestCase):
         detail = {
             "schemaVersion": 1,
             "id": games[0]["id"],
-            "name": games[0]["name"],
-            "players": games[0]["players"],
+            "name": detail_name if detail_name is not None else games[0]["name"],
+            "players": {"min": 2, "max": 4},
             "result": {"type": "score", "winner": "highest"},
             "rounds": {"enabled": False},
             "playMode": "individual",
@@ -91,6 +90,35 @@ class CatalogValidationTests(unittest.TestCase):
         self.write_catalog()
         self.validate()
 
+    def test_minimal_index_entry_is_valid(self):
+        self.write_catalog()
+        self.validate()
+
+    def test_index_accepts_optional_icon_and_image(self):
+        self.write_catalog("images/test-game.webp", "images/test-game.webp")
+        self.write_webp(self.root / "images/test-game.webp")
+        catalog = json.loads((self.root / "catalog.json").read_text(encoding="utf-8"))
+        catalog["games"][0]["icon"] = "dice"
+        (self.root / "catalog.json").write_text(json.dumps(catalog), encoding="utf-8")
+        self.validate()
+
+    def test_index_rejects_functional_properties(self):
+        properties = {
+            "players": {"min": 2, "max": 4},
+            "minimumAge": 10,
+            "result": {"type": "score", "winner": "highest"},
+            "rounds": {"enabled": False},
+            "playMode": "individual",
+            "rules": "not an index property",
+        }
+        for property_name, value in properties.items():
+            with self.subTest(property_name=property_name):
+                self.write_catalog()
+                catalog = json.loads((self.root / "catalog.json").read_text(encoding="utf-8"))
+                catalog["games"][0][property_name] = value
+                (self.root / "catalog.json").write_text(json.dumps(catalog), encoding="utf-8")
+                self.assert_invalid()
+
     def test_valid_webp_and_multiple_images_are_valid(self):
         self.write_catalog("images/test-game.webp", "images/test-game.webp")
         self.write_webp(self.root / "images/test-game.webp")
@@ -99,7 +127,6 @@ class CatalogValidationTests(unittest.TestCase):
         second = {
             "id": "second-game",
             "name": "Second game",
-            "players": {"min": 2, "max": 4},
             "path": "games/second-game.json",
             "image": "images/second-game.webp",
         }
@@ -130,6 +157,13 @@ class CatalogValidationTests(unittest.TestCase):
     def test_index_and_detail_image_paths_must_match(self):
         self.write_catalog("images/test-game.webp", "images/other.webp")
         self.assert_invalid()
+
+    def test_index_and_detail_names_must_match(self):
+        self.write_catalog(detail_name="ScrabbleTEST")
+        self.assert_invalid()
+
+        self.write_catalog()
+        self.validate()
 
     def test_image_name_and_extension_are_strict(self):
         for image_path in (
