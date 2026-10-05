@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "id": "duel",
-  "name": "Duel",
+  "id": "echecs",
+  "name": "Echecs",
   "players": {
     "min": 2,
     "max": 2
@@ -14,5 +14,5 @@
     "enabled": false
   },
   "playMode": "individual",
-  "rules": "Le vainqueur est le joueur qui remporte le duel."
+  "rules": "Le but du jeu d'échecs est de mettre le roi adverse en échec et mat."
 }

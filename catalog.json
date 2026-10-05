@@ -10,12 +10,6 @@
       "icon": "trophy"
     },
     {
-      "id": "duel",
-      "name": "Duel",
-      "path": "games/duel.json",
-      "icon": "combat"
-    },
-    {
       "id": "relais-chronometre",
       "name": "Relais chronométré",
       "path": "games/relais-chronometre.json",
@@ -26,6 +20,12 @@
       "name": "Scrabble",
       "path": "games/scrabble.json",
       "image": "images/scrabble.webp"
+    },
+{
+      "id": "echecs",
+      "name": "Echecs",
+      "path": "games/echecs.json",
+      "image": "images/echecs.webp"
     }
   ]
 }
