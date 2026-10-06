@@ -13,6 +13,7 @@
   "rounds": {
     "enabled": false
   },
+  "image": "images/echecs.webp",
   "playMode": "individual",
   "rules": "Le but du jeu d'échecs est de mettre le roi adverse en échec et mat."
 }
