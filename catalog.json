@@ -1,31 +1,59 @@
 {
-  "schemaVersion": 1,
-  "catalogVersion": "2026-10-04.2",
+  "schemaVersion": 2,
+  "catalogVersion": "2026-10-09.3",
   "language": "fr",
   "games": [
     {
       "id": "defi-des-manches",
       "name": "Défi des manches",
       "path": "games/defi-des-manches.json",
+      "players": {"min": 2, "max": 8},
+      "playMode": "individual",
+      "requiredCapabilities": [],
       "icon": "trophy"
     },
     {
       "id": "relais-chronometre",
       "name": "Relais chronométré",
       "path": "games/relais-chronometre.json",
-      "icon": "stopwatch"
+      "players": {"min": 2, "max": null},
+      "playMode": "teams",
+      "requiredCapabilities": []
     },
     {
       "id": "scrabble",
       "name": "Scrabble",
       "path": "games/scrabble.json",
+      "players": {"min": 2, "max": 4},
+      "playMode": "individual",
+      "requiredCapabilities": [],
+      "minimumAge": 10,
       "image": "images/scrabble.webp"
     },
-{
+    {
       "id": "echecs",
       "name": "Echecs",
       "path": "games/echecs.json",
+      "players": {"min": 2, "max": 2},
+      "playMode": "individual",
+      "requiredCapabilities": [],
       "image": "images/echecs.webp"
+    },
+    {
+      "id": "petanque",
+      "name": "Pétanque",
+      "path": "games/petanque.json",
+      "players": {"min": 2, "max": 2},
+      "playMode": "teams",
+      "requiredCapabilities": [
+        "counter.v1",
+        "action.v1",
+        "action.counter.add.v1",
+        "target.v1",
+        "outcome.targetReached.v1",
+        "action.integerBounds.v1"
+      ],
+      "image": "images/petanque.webp"
     }
   ]
 }

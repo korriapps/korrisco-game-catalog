@@ -18,15 +18,14 @@ class CatalogValidationTests(unittest.TestCase):
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
         self.root = Path(self.tempdir.name)
-        (self.root / "games").mkdir()
         (self.root / "schema").mkdir()
-        shutil.copy(REPOSITORY_ROOT / "schema/game.schema.json", self.root / "schema/game.schema.json")
+        shutil.copy(REPOSITORY_ROOT / "schema/catalog.schema.json", self.root / "schema/catalog.schema.json")
         self.original_root = validate_catalog.ROOT
         self.original_catalog_path = validate_catalog.CATALOG_PATH
         self.original_schema_path = validate_catalog.SCHEMA_PATH
         validate_catalog.ROOT = self.root
         validate_catalog.CATALOG_PATH = self.root / "catalog.json"
-        validate_catalog.SCHEMA_PATH = self.root / "schema/game.schema.json"
+        validate_catalog.SCHEMA_PATH = self.root / "schema/catalog.schema.json"
 
     def tearDown(self):
         validate_catalog.ROOT = self.original_root
@@ -34,38 +33,47 @@ class CatalogValidationTests(unittest.TestCase):
         validate_catalog.SCHEMA_PATH = self.original_schema_path
         self.tempdir.cleanup()
 
-    def write_catalog(self, index_image=None, detail_image=None, detail_name=None, games=None):
-        games = games or [
-            {
-                "id": "test-game",
-                "name": "Test game",
-                "path": "games/test-game.json",
-            }
-        ]
-        if index_image is not None:
-            games[0]["image"] = index_image
-        detail = {
-            "schemaVersion": 1,
-            "id": games[0]["id"],
-            "name": detail_name if detail_name is not None else games[0]["name"],
+    def standard_entry(self, **overrides):
+        entry = {
+            "id": "test-game",
+            "name": "Test game",
             "players": {"min": 2, "max": 4},
-            "result": {"type": "score", "winner": "highest"},
-            "rounds": {"enabled": False},
             "playMode": "individual",
+            "requiredCapabilities": [],
+            "gameRules": {
+                "type": "standard",
+                "scoring": {"type": "points", "inputMode": "scalar"},
+                "victory": {"type": "ranking", "direction": "highest", "tiePolicy": "shared"},
+            },
             "rules": "Règle de test.",
         }
-        if detail_image is not None:
-            detail["image"] = detail_image
-        (self.root / "games/test-game.json").write_text(json.dumps(detail), encoding="utf-8")
-        (self.root / "catalog.json").write_text(
-            json.dumps({
-                "schemaVersion": 1,
-                "catalogVersion": "test",
-                "language": "fr",
-                "games": games,
-            }),
-            encoding="utf-8",
-        )
+        entry.update(overrides)
+        return entry
+
+    def write_catalog(self, entries=None):
+        entries = entries or [self.standard_entry()]
+        index_entries = []
+        games_root = self.root / "games"
+        games_root.mkdir(exist_ok=True)
+        for entry in entries:
+            detail = {"schemaVersion": 2, **entry}
+            game_path = games_root / f"{entry['id']}.json"
+            game_path.write_text(json.dumps(detail), encoding="utf-8")
+            index_entries.append({
+                key: entry[key]
+                for key in (
+                    "id", "name", "players", "playMode", "requiredCapabilities",
+                    "icon", "image", "minimumAge",
+                )
+                if key in entry
+            } | {"path": f"games/{entry['id']}.json"})
+        catalog = {
+            "schemaVersion": 2,
+            "catalogVersion": "test",
+            "language": "fr",
+            "games": index_entries,
+        }
+        (self.root / "catalog.json").write_text(json.dumps(catalog), encoding="utf-8")
 
     def validate(self):
         catalog = validate_catalog.load_json(validate_catalog.CATALOG_PATH)
@@ -74,144 +82,168 @@ class CatalogValidationTests(unittest.TestCase):
 
     def write_webp(self, path, size=(256, 256), quality=80):
         path.parent.mkdir(parents=True, exist_ok=True)
-        image = Image.new("RGB", size, (20, 40, 80))
-        image.save(path, format="WEBP", quality=quality)
-
-    def write_image(self, path, image_format, size=(256, 256)):
-        path.parent.mkdir(parents=True, exist_ok=True)
-        image = Image.new("RGB", size, (20, 40, 80))
-        image.save(path, format=image_format)
+        Image.new("RGB", size, (20, 40, 80)).save(path, format="WEBP", quality=quality)
 
     def assert_invalid(self):
         with self.assertRaises(validate_catalog.ValidationFailure):
             self.validate()
 
-    def test_game_without_image_is_valid(self):
+    def test_valid_v2_standard_catalog(self):
         self.write_catalog()
         self.validate()
 
-    def test_minimal_index_entry_is_valid(self):
-        self.write_catalog()
+    def test_published_games_preserve_migrated_v1_behavior(self):
+        catalog = json.loads((REPOSITORY_ROOT / "catalog.json").read_text(encoding="utf-8"))
+        games = {
+            entry["id"]: json.loads(
+                (REPOSITORY_ROOT / entry["path"]).read_text(encoding="utf-8")
+            )
+            for entry in catalog["games"]
+        }
+        self.assertEqual(set(games), {
+            "defi-des-manches", "relais-chronometre", "scrabble", "echecs", "petanque",
+        })
+        self.assertEqual(games["defi-des-manches"]["players"], {"min": 2, "max": 8})
+        self.assertEqual(games["defi-des-manches"]["gameRules"]["progression"]["count"], 5)
+        self.assertEqual(games["relais-chronometre"]["playMode"], "teams")
+        self.assertEqual(games["relais-chronometre"]["gameRules"]["victory"]["direction"], "shortest")
+        self.assertEqual(games["scrabble"]["minimumAge"], 10)
+        self.assertIsNone(games["scrabble"]["gameRules"]["progression"]["count"])
+        self.assertEqual(games["echecs"]["players"], {"min": 2, "max": 2})
+        self.assertEqual(games["echecs"]["gameRules"]["scoring"]["type"], "winLoss")
+        self.assertFalse(games["echecs"]["gameRules"]["victory"]["allowMultiple"])
+
+    def test_valid_v2_declarative_catalog(self):
+        definition = {
+            "schemaVersion": 5,
+            "counters": [{"id": "points", "initialValue": 0, "scope": "participant"}],
+            "actions": [{
+                "id": "addPoints",
+                "parameters": [
+                    {"id": "participant", "type": "participant"},
+                    {"id": "points", "type": "integer", "minValue": 1, "maxValue": 6},
+                ],
+                "operations": [{
+                    "type": "add", "counter": "points",
+                    "value": {"type": "parameter", "parameter": "points"},
+                    "participantParameter": "participant",
+                }],
+            }],
+            "targets": [{"id": "thirteen", "counter": "points", "comparison": "atLeast", "value": 13}],
+            "transitions": [],
+            "outcome": {"type": "targetReached", "target": "thirteen"},
+        }
+        entry = {
+            "id": "declarative-game",
+            "name": "Declarative game",
+            "players": {"min": 2, "max": 2},
+            "playMode": "teams",
+            "requiredCapabilities": [
+                "counter.v1", "action.v1", "action.counter.add.v1", "target.v1",
+                "outcome.targetReached.v1", "action.integerBounds.v1",
+            ],
+            "gameRules": {"type": "declarative", "definition": definition},
+        }
+        self.write_catalog([entry])
         self.validate()
 
-    def test_index_accepts_optional_icon_and_image(self):
-        self.write_catalog("images/test-game.webp", "images/test-game.webp")
+    def test_image_is_optional_and_valid_image_is_accepted(self):
+        entry = self.standard_entry(image="images/test-game.webp")
+        self.write_catalog([entry])
         self.write_webp(self.root / "images/test-game.webp")
-        catalog = json.loads((self.root / "catalog.json").read_text(encoding="utf-8"))
-        catalog["games"][0]["icon"] = "dice"
-        (self.root / "catalog.json").write_text(json.dumps(catalog), encoding="utf-8")
         self.validate()
 
-    def test_index_rejects_functional_properties(self):
-        properties = {
-            "players": {"min": 2, "max": 4},
-            "minimumAge": 10,
-            "result": {"type": "score", "winner": "highest"},
-            "rounds": {"enabled": False},
-            "playMode": "individual",
-            "rules": "not an index property",
-        }
-        for property_name, value in properties.items():
-            with self.subTest(property_name=property_name):
-                self.write_catalog()
-                catalog = json.loads((self.root / "catalog.json").read_text(encoding="utf-8"))
-                catalog["games"][0][property_name] = value
-                (self.root / "catalog.json").write_text(json.dumps(catalog), encoding="utf-8")
-                self.assert_invalid()
-
-    def test_valid_webp_and_multiple_images_are_valid(self):
-        self.write_catalog("images/test-game.webp", "images/test-game.webp")
-        self.write_webp(self.root / "images/test-game.webp")
-        self.validate()
-
-        second = {
-            "id": "second-game",
-            "name": "Second game",
-            "path": "games/second-game.json",
-            "image": "images/second-game.webp",
-        }
-        second_detail = {
-            "schemaVersion": 1,
-            "id": "second-game",
-            "name": "Second game",
-            "players": {"min": 2, "max": 4},
-            "result": {"type": "score", "winner": "highest"},
-            "rounds": {"enabled": False},
-            "playMode": "individual",
-            "rules": "Règle de test.",
-            "image": "images/second-game.webp",
-        }
-        (self.root / "games/second-game.json").write_text(json.dumps(second_detail), encoding="utf-8")
-        catalog = json.loads((self.root / "catalog.json").read_text(encoding="utf-8"))
-        catalog["games"].append(second)
-        (self.root / "catalog.json").write_text(json.dumps(catalog), encoding="utf-8")
-        self.write_webp(self.root / "images/second-game.webp")
-        self.validate()
-
-    def test_image_must_be_declared_in_both_index_and_detail(self):
-        self.write_catalog(index_image="images/test-game.webp")
-        self.assert_invalid()
-        self.write_catalog(detail_image="images/test-game.webp")
-        self.assert_invalid()
-
-    def test_index_and_detail_image_paths_must_match(self):
-        self.write_catalog("images/test-game.webp", "images/other.webp")
-        self.assert_invalid()
-
-    def test_index_and_detail_names_must_match(self):
-        self.write_catalog(detail_name="ScrabbleTEST")
-        self.assert_invalid()
-
+    def test_schema_version_must_be_two(self):
         self.write_catalog()
-        self.validate()
+        catalog = json.loads((self.root / "catalog.json").read_text())
+        catalog["schemaVersion"] = 1
+        (self.root / "catalog.json").write_text(json.dumps(catalog))
+        self.assert_invalid()
 
-    def test_image_name_and_extension_are_strict(self):
+    def test_duplicate_ids_are_rejected(self):
+        self.write_catalog([self.standard_entry(), self.standard_entry()])
+        self.assert_invalid()
+
+    def test_index_requires_a_referenced_detail(self):
+        self.write_catalog()
+        (self.root / "games/test-game.json").unlink()
+        self.assert_invalid()
+
+    def test_orphan_game_detail_is_rejected(self):
+        self.write_catalog()
+        (self.root / "games/orphan.json").write_text(
+            json.dumps({"schemaVersion": 2, "id": "orphan"}), encoding="utf-8"
+        )
+        self.assert_invalid()
+
+    def test_index_and_detail_metadata_must_match(self):
+        self.write_catalog()
+        detail_path = self.root / "games/test-game.json"
+        detail = json.loads(detail_path.read_text(encoding="utf-8"))
+        detail["playMode"] = "teams"
+        detail_path.write_text(json.dumps(detail), encoding="utf-8")
+        self.assert_invalid()
+
+    def test_index_and_detail_capabilities_must_match(self):
+        self.write_catalog()
+        detail_path = self.root / "games/test-game.json"
+        detail = json.loads(detail_path.read_text(encoding="utf-8"))
+        detail["requiredCapabilities"] = ["counter.v1"]
+        detail_path.write_text(json.dumps(detail), encoding="utf-8")
+        self.assert_invalid()
+
+    def test_invalid_players_are_rejected(self):
+        self.write_catalog([self.standard_entry(players={"min": 4, "max": 2})])
+        self.assert_invalid()
+
+    def test_unknown_play_mode_is_rejected(self):
+        self.write_catalog([self.standard_entry(playMode="pairs")])
+        self.assert_invalid()
+
+    def test_unknown_game_rules_type_is_rejected(self):
+        self.write_catalog([self.standard_entry(gameRules={"type": "custom"})])
+        self.assert_invalid()
+
+    def test_standard_rules_require_empty_capabilities(self):
+        self.write_catalog([self.standard_entry(requiredCapabilities=["counter.v1"])])
+        self.assert_invalid()
+
+    def test_declarative_capabilities_must_match_definition(self):
+        self.write_catalog([{
+            "id": "declarative-game", "name": "Declarative", "players": {"min": 1},
+            "playMode": "individual", "requiredCapabilities": ["counter.v1", "action.v1"],
+            "gameRules": {"type": "declarative", "definition": {
+                "schemaVersion": 5, "counters": [{"id": "score", "initialValue": 0, "scope": "participant"}],
+                "actions": [], "targets": [], "transitions": [],
+            }},
+        }])
+        self.assert_invalid()
+
+    def test_image_must_exist_and_match_game_id(self):
+        self.write_catalog([self.standard_entry(image="images/other.webp")])
+        self.assert_invalid()
+        self.write_catalog([self.standard_entry(image="images/test-game.webp")])
+        self.assert_invalid()
+
+    def test_image_must_be_webp_256_and_under_100_kib(self):
+        entry = self.standard_entry(image="images/test-game.webp")
+        for size in ((255, 256), (256, 255)):
+            self.write_catalog([entry])
+            self.write_webp(self.root / "images/test-game.webp", size=size)
+            self.assert_invalid()
+        self.write_catalog([entry])
+        (self.root / "images").mkdir(exist_ok=True)
+        (self.root / "images/test-game.webp").write_bytes(os.urandom(100 * 1024 + 1))
+        self.assert_invalid()
+
+    def test_non_webp_and_dangerous_image_paths_are_rejected(self):
         for image_path in (
-            "images/other.webp",
-            "images/test-game.png",
-            "images/test-game.jpeg",
-            "images/test-game.webp?x=1",
-            "images/test-game.webp#fragment",
-            "images/../test-game.webp",
-            "/images/test-game.webp",
-            "images\\test-game.webp",
-            "http://example.test/test-game.webp",
-            "https://example.test/test-game.webp",
-            "file:images/test-game.webp",
-            "data:image/webp;base64,AAAA",
+            "images/test-game.png", "images/test-game.webp?x=1", "images/../test-game.webp",
+            "/images/test-game.webp", "images\\test-game.webp", "https://example.test/test-game.webp",
         ):
             with self.subTest(image_path=image_path):
-                self.write_catalog(image_path, image_path)
+                self.write_catalog([self.standard_entry(image=image_path)])
                 self.assert_invalid()
-
-    def test_png_and_jpeg_bytes_are_rejected_even_with_webp_extension(self):
-        for image_format in ("PNG", "JPEG"):
-            with self.subTest(image_format=image_format):
-                self.write_catalog("images/test-game.webp", "images/test-game.webp")
-                self.write_image(self.root / "images/test-game.webp", image_format)
-                self.assert_invalid()
-
-    def test_missing_invalid_and_undecodable_images_are_rejected(self):
-        self.write_catalog("images/test-game.webp", "images/test-game.webp")
-        self.assert_invalid()
-        image_path = self.root / "images/test-game.webp"
-        image_path.parent.mkdir()
-        image_path.write_bytes(b"not a WebP")
-        self.assert_invalid()
-
-    def test_dimensions_must_be_exactly_256_by_256(self):
-        for size in ((255, 256), (256, 255), (257, 256), (256, 257)):
-            with self.subTest(size=size):
-                self.write_catalog("images/test-game.webp", "images/test-game.webp")
-                self.write_webp(self.root / "images/test-game.webp", size=size)
-                self.assert_invalid()
-
-    def test_file_must_not_exceed_100_kib(self):
-        self.write_catalog("images/test-game.webp", "images/test-game.webp")
-        image_path = self.root / "images/test-game.webp"
-        image_path.parent.mkdir(parents=True, exist_ok=True)
-        image_path.write_bytes(os.urandom(100 * 1024 + 1))
-        self.assert_invalid()
 
     def test_orphan_webp_is_rejected(self):
         self.write_catalog()

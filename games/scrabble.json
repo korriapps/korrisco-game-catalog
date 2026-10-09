@@ -1,21 +1,17 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "scrabble",
   "name": "Scrabble",
-  "players": {
-    "min": 2,
-    "max": 4
+  "players": {"min": 2, "max": 4},
+  "playMode": "individual",
+  "requiredCapabilities": [],
+  "gameRules": {
+    "type": "standard",
+    "scoring": {"type": "points", "inputMode": "scalar"},
+    "progression": {"type": "rounds", "label": "Manche", "count": null},
+    "victory": {"type": "ranking", "direction": "highest", "tiePolicy": "shared"}
   },
   "minimumAge": 10,
-  "result": {
-    "type": "score",
-    "winner": "highest"
-  },
-  "rounds": {
-    "enabled": true,
-    "count": null
-  },
   "image": "images/scrabble.webp",
-  "playMode": "individual",
   "rules": "À chaque tour, saisissez le score réalisé par chaque joueur. Le total le plus élevé à la fin de la partie gagne."
 }

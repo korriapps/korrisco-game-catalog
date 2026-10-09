@@ -1,19 +1,15 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "echecs",
   "name": "Echecs",
-  "players": {
-    "min": 2,
-    "max": 2
-  },
-  "result": {
-    "type": "winLoss",
-    "allowMultipleWinners": false
-  },
-  "rounds": {
-    "enabled": false
+  "players": {"min": 2, "max": 2},
+  "playMode": "individual",
+  "requiredCapabilities": [],
+  "gameRules": {
+    "type": "standard",
+    "scoring": {"type": "winLoss"},
+    "victory": {"type": "manual", "allowMultiple": false, "tiePolicy": "forbidden"}
   },
   "image": "images/echecs.webp",
-  "playMode": "individual",
   "rules": "Le but du jeu d'échecs est de mettre le roi adverse en échec et mat."
 }

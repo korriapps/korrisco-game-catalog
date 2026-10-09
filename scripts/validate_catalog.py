@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the public KorriSco catalog without requiring Flutter."""
+"""Validate the public KorriSco V2 catalog without requiring Flutter."""
 
 from __future__ import annotations
 
@@ -16,9 +16,8 @@ from jsonschema import Draft202012Validator
 
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG_PATH = ROOT / "catalog.json"
-SCHEMA_PATH = ROOT / "schema" / "game.schema.json"
+SCHEMA_PATH = ROOT / "schema" / "catalog.schema.json"
 ID_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-CATALOG_ENTRY_ALLOWED_FIELDS = frozenset({"id", "name", "path", "icon", "image"})
 
 
 class ValidationFailure(Exception):
@@ -76,90 +75,166 @@ def validate_image(value: object, *, game_id: str, field: str) -> Path:
     return image_path.resolve()
 
 
+def _derived_capabilities(definition: dict) -> set[str]:
+    """Mirror only the small capability derivation table of RuleDefinition.
+
+    Flutter remains authoritative for semantic rule validation. This check is
+    deliberately limited to the published capability names and their direct
+    structural triggers.
+    """
+    capabilities: set[str] = set()
+    counters = definition.get("counters", [])
+    actions = definition.get("actions", [])
+    transitions = definition.get("transitions", [])
+    if counters:
+        capabilities.add("counter.v1")
+    if actions:
+        capabilities.add("action.v1")
+    operation_types = {
+        operation.get("type")
+        for action in actions
+        for operation in action.get("operations", [])
+    }
+    for operation_type, capability in (
+        ("add", "action.counter.add.v1"),
+        ("subtract", "action.counter.subtract.v1"),
+        ("set", "action.counter.set.v1"),
+    ):
+        if operation_type in operation_types:
+            capabilities.add(capability)
+    if "eliminate" in operation_types:
+        capabilities.update({"elimination.v1", "operation.participant.eliminate.v1"})
+    if definition.get("targets"):
+        capabilities.add("target.v1")
+    outcome_type = (definition.get("outcome") or {}).get("type")
+    if outcome_type == "targetReached":
+        capabilities.add("outcome.targetReached.v1")
+    elif outcome_type == "lastActive":
+        capabilities.add("outcome.lastActive.v1")
+    if transitions:
+        capabilities.add("transition.v1")
+        condition_types = {
+            transition.get("condition", {}).get("type") for transition in transitions
+        }
+        if "counter" in condition_types:
+            capabilities.add("condition.counter.v1")
+        if "actionParameter" in condition_types:
+            capabilities.add("condition.actionIntegerParameter.v1")
+        if any(
+            operation.get("type") == "eliminate"
+            for transition in transitions
+            for operation in transition.get("operations", [])
+        ):
+            capabilities.update({"elimination.v1", "operation.participant.eliminate.v1"})
+    if any(counter.get("scope") == "global" for counter in counters):
+        capabilities.add("counter.global.v1")
+    if any(
+        parameter.get("type") == "integer"
+        and (parameter.get("minValue") is not None or parameter.get("maxValue") is not None)
+        for action in actions
+        for parameter in action.get("parameters", [])
+    ):
+        capabilities.add("action.integerBounds.v1")
+    return capabilities
+
+
 def validate_catalog(catalog: dict, schema: dict) -> None:
-    if catalog.get("schemaVersion") != 1:
-        fail("catalog.json.schemaVersion", "must equal 1")
-    if not isinstance(catalog.get("catalogVersion"), str) or not catalog["catalogVersion"].strip():
-        fail("catalog.json.catalogVersion", "must be a non-empty string")
-    if catalog.get("language") != "fr":
-        fail("catalog.json.language", "must equal fr for V1")
-    games = catalog.get("games")
-    if not isinstance(games, list):
-        fail("catalog.json.games", "must be an array")
+    errors = sorted(Draft202012Validator(schema).iter_errors(catalog), key=lambda error: list(error.path))
+    if errors:
+        error = errors[0]
+        location = ".".join(str(part) for part in error.path) or "<root>"
+        fail("catalog.json", f"schema error at {location}: {error.message}")
 
     ids: set[str] = set()
     paths: set[str] = set()
-    referenced_paths: set[Path] = set()
+    referenced_game_paths: set[Path] = set()
     referenced_image_paths: set[Path] = set()
-
+    games = catalog["games"]
     for index, entry in enumerate(games):
         entry_path = f"catalog.json.games[{index}]"
-        if not isinstance(entry, dict):
-            fail(entry_path, "must be an object")
-        unknown_fields = sorted(set(entry) - CATALOG_ENTRY_ALLOWED_FIELDS)
-        if unknown_fields:
-            fail(entry_path, f"contains non-index properties: {', '.join(unknown_fields)}")
-        for required in ("id", "name", "path"):
-            if required not in entry:
-                fail(entry_path, f"missing required field {required}")
         game_id = entry["id"]
-        if not isinstance(game_id, str) or not ID_PATTERN.fullmatch(game_id):
+        if not ID_PATTERN.fullmatch(game_id):
             fail(f"{entry_path}.id", "must match lowercase kebab-case")
         if game_id in ids:
             fail(f"{entry_path}.id", f"duplicate id {game_id}")
         ids.add(game_id)
-        if not isinstance(entry["name"], str) or not entry["name"].strip():
-            fail(f"{entry_path}.name", "must be a non-empty string")
-        path = validate_relative_path(entry["path"], field=f"{entry_path}.path", prefix="games/")
-        if entry["path"] in paths:
-            fail(f"{entry_path}.path", "duplicate catalog path")
-        paths.add(entry["path"])
-        referenced_paths.add(path.resolve())
-        if not path.is_file():
-            fail(f"{entry_path}.path", f"file does not exist: {entry['path']}")
-        if path.name != f"{game_id}.json":
-            fail(f"{entry_path}.path", "filename must be games/<id>.json")
-        if "icon" in entry and (not isinstance(entry["icon"], str) or not entry["icon"].strip()):
-            fail(f"{entry_path}.icon", "must be a non-empty string")
-        detail = load_json(path)
-        errors = sorted(Draft202012Validator(schema).iter_errors(detail), key=lambda error: list(error.path))
-        if errors:
-            error = errors[0]
-            location = ".".join(str(part) for part in error.path) or "<root>"
-            fail(str(path.relative_to(ROOT)), f"schema error at {location}: {error.message}")
-        if detail.get("id") != game_id:
-            fail(str(path.relative_to(ROOT)), f"id {detail.get('id')!r} does not match catalog id {game_id!r}")
-        if detail.get("name") != entry["name"]:
-            fail(
-                str(path.relative_to(ROOT)),
-                f"name differs from catalog entry: index={entry['name']!r}, detail={detail.get('name')!r}",
-            )
-        detail_players = detail.get("players", {})
-        if detail_players.get("max") is not None and detail_players["max"] < detail_players["min"]:
-            fail(str(path.relative_to(ROOT)), "players.max must be >= players.min")
-        index_image = entry.get("image")
-        detail_image = detail.get("image")
-        if (index_image is None) != (detail_image is None):
-            fail(
-                f"{path.relative_to(ROOT)}.image",
-                "image must be declared identically in catalog.json and the game detail",
-            )
-        if index_image is not None and index_image != detail_image:
-            fail(
-                f"{path.relative_to(ROOT)}.image",
-                "image path differs between catalog.json and the game detail",
-            )
-        if index_image is not None:
+        path = entry["path"]
+        if path in paths:
+            fail(f"{entry_path}.path", f"duplicate path {path}")
+        paths.add(path)
+        detail_path = validate_relative_path(path, field=f"{entry_path}.path", prefix="games/")
+        if path != f"games/{game_id}.json":
+            fail(f"{entry_path}.path", f"must equal games/{game_id}.json")
+        detail = load_json(detail_path)
+        referenced_game_paths.add(detail_path.resolve())
+        validate_game_detail(detail, schema, entry, entry_path, detail_path)
+        players = entry["players"]
+        if players.get("max") is not None and players["max"] < players["min"]:
+            fail(f"{entry_path}.players", "max must be greater than or equal to min")
+
+        if "image" in entry:
             referenced_image_paths.add(
-                validate_image(index_image, game_id=game_id, field=f"{entry_path}.image")
+                validate_image(entry["image"], game_id=game_id, field=f"{entry_path}.image")
             )
 
-    for orphan in sorted((ROOT / "games").glob("*.json")) if (ROOT / "games").is_dir() else []:
-        if orphan.resolve() not in referenced_paths:
-            fail(str(orphan.relative_to(ROOT)), "orphan game file is not referenced by catalog.json")
+    games_directory = ROOT / "games"
+    if games_directory.is_dir():
+        for orphan in sorted(games_directory.glob("*.json")):
+            if orphan.resolve() not in referenced_game_paths:
+                fail(str(orphan.relative_to(ROOT)), "orphan game definition is not referenced by catalog.json")
+
     for orphan in sorted((ROOT / "images").glob("*.webp")) if (ROOT / "images").is_dir() else []:
         if orphan.resolve() not in referenced_image_paths:
             fail(str(orphan.relative_to(ROOT)), "orphan WebP image is not referenced by catalog.json")
+
+
+def validate_game_detail(
+    detail: dict,
+    schema: dict,
+    entry: dict,
+    entry_path: str,
+    detail_path: Path,
+) -> None:
+    detail_schema = {
+        "$schema": schema["$schema"],
+        "$defs": schema["$defs"],
+        "$ref": "#/$defs/gameDetail",
+    }
+    errors = sorted(
+        Draft202012Validator(detail_schema).iter_errors(detail),
+        key=lambda error: list(error.path),
+    )
+    if errors:
+        error = errors[0]
+        location = ".".join(str(part) for part in error.path) or "<root>"
+        fail(f"{detail_path.relative_to(ROOT)}", f"schema error at {location}: {error.message}")
+
+    relative = str(detail_path.relative_to(ROOT))
+    if detail["id"] != entry["id"]:
+        fail(relative, f"id {detail['id']!r} does not match index id {entry['id']!r}")
+    for key in ("name", "players", "playMode", "requiredCapabilities", "minimumAge", "icon", "image"):
+        if entry.get(key) != detail.get(key):
+            fail(
+                relative,
+                f"{key} does not match catalog index: index={entry.get(key)!r}, detail={detail.get(key)!r}",
+            )
+    players = detail["players"]
+    if players.get("max") is not None and players["max"] < players["min"]:
+        fail(f"{relative}.players", "max must be greater than or equal to min")
+    capabilities = set(detail["requiredCapabilities"])
+    rules = detail["gameRules"]
+    if rules["type"] == "standard":
+        if capabilities:
+            fail(f"{relative}.requiredCapabilities", "standard games must declare an empty array")
+    else:
+        derived = _derived_capabilities(rules["definition"])
+        if capabilities != derived:
+            fail(
+                f"{relative}.requiredCapabilities",
+                f"must match derived capabilities; expected {sorted(derived)}, got {sorted(capabilities)}",
+            )
+    if "image" in detail:
+        validate_image(detail["image"], game_id=detail["id"], field=f"{relative}.image")
 
 
 def main() -> int:
@@ -169,7 +244,7 @@ def main() -> int:
         if not isinstance(catalog, dict):
             fail("catalog.json", "root must be an object")
         if not isinstance(schema, dict):
-            fail("schema/game.schema.json", "root must be an object")
+            fail("schema/catalog.schema.json", "root must be an object")
         validate_catalog(catalog, schema)
     except ValidationFailure as exc:
         print(f"ERROR: {exc}", file=sys.stderr)

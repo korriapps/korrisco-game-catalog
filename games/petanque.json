@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 2,
+  "id": "petanque",
+  "name": "Pétanque",
+  "players": {"min": 2, "max": 2},
+  "playMode": "teams",
+  "requiredCapabilities": [
+    "counter.v1",
+    "action.v1",
+    "action.counter.add.v1",
+    "target.v1",
+    "outcome.targetReached.v1",
+    "action.integerBounds.v1"
+  ],
+  "image": "images/petanque.webp",
+  "gameRules": {
+    "type": "declarative",
+    "definition": {
+      "schemaVersion": 5,
+      "counters": [
+        {"id": "points", "initialValue": 0, "scope": "participant"}
+      ],
+      "actions": [
+        {
+          "id": "addPoints",
+          "parameters": [
+            {"id": "team", "type": "participant"},
+            {"id": "points", "type": "integer", "minValue": 1, "maxValue": 6}
+          ],
+          "operations": [
+            {
+              "type": "add",
+              "counter": "points",
+              "value": {"type": "parameter", "parameter": "points"},
+              "participantParameter": "team"
+            }
+          ]
+        }
+      ],
+      "targets": [
+        {"id": "thirteen", "counter": "points", "comparison": "atLeast", "value": 13}
+      ],
+      "transitions": [],
+      "outcome": {"type": "targetReached", "target": "thirteen"}
+    },
+    "presentation": {
+      "actions": [
+        {
+          "actionId": "addPoints",
+          "label": "Ajouter les points de la mène",
+          "order": 10,
+          "emphasis": "primary",
+          "parameters": [
+            {"type": "participant", "parameterId": "team", "label": "Équipe"},
+            {"type": "integer", "parameterId": "points", "label": "Points", "suggestedValue": 1, "step": 1}
+          ]
+        }
+      ]
+    }
+  },
+  "rules": "Deux équipes s'affrontent. À chaque mène, l'équipe qui marque ajoute de 1 à 6 points. La première équipe à atteindre au moins 13 points remporte la partie."
+}

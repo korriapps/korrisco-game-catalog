@@ -1,58 +1,61 @@
 # KorriSco Game Catalog
 
-Catalogue public officiel de configurations de jeux pour KorriSco. Ce dépôt est autonome : l’application Flutter le consomme en lecture seule, puis chaque jeu importé devient une copie locale indépendante.
+Catalogue public officiel de configurations de jeux pour KorriSco. Le dépôt est autonome : l’application le consomme en lecture seule, puis chaque jeu importé devient une copie locale indépendante.
 
-## Structure
+## Contrat V2
 
-- `catalog.json` — index public et métadonnées utilisées par la liste ;
-- `games/` — une configuration JSON détaillée par jeu ;
-- `images/` — illustrations optionnelles (aucune image n’est requise pour les fixtures actuelles) ;
-- `schema/game.schema.json` — contrat JSON Schema Draft 2020-12 des configurations ;
-- `scripts/validate_catalog.py` — validation de l’index, des fichiers et des règles entre champs.
+`catalog.json` est l’index V2 publié et utilise `schemaVersion: 2`. Il contient uniquement les métadonnées nécessaires à l’affichage, à la recherche, au tri, à la compatibilité et à la localisation de la fiche détaillée. Une fiche est chargée uniquement lorsqu’un jeu est sélectionné/importé.
 
-## Format V1
+Chaque entrée contient au minimum :
 
-Les identifiants sont en lowercase kebab-case ASCII, par exemple `relais-chronometre`. Les chemins sont relatifs et les configurations détaillées utilisent `schemaVersion: 1`. Les propriétés additives inconnues restent autorisées ; `scoreStep` est explicitement interdit.
+- `id` : identifiant lowercase kebab-case ASCII ;
+- `name` ;
+- `path` : chemin relatif explicite vers `games/<id>.json` ;
+- `players` ;
+- `playMode` (`individual` ou `teams`) ;
+- `requiredCapabilities`.
 
-Les manches se configurent de trois façons : `rounds.enabled: false` signifie qu’il n’y a pas de manches ; `rounds.enabled: true` avec un entier `count` de 2 à 99 définit un nombre fixe ; `rounds.enabled: true` avec `count: null` indique que les tours sont ajoutés progressivement pendant la partie.
+Les métadonnées facultatives d’index sont `icon`, `image` et `minimumAge`. Les règles utilisateur et `gameRules` appartiennent exclusivement à la fiche `games/<id>.json`. Les métadonnées répétées dans l’index et la fiche sont contrôlées par le validateur afin d’éviter les divergences.
 
-`catalogVersion` est une chaîne opaque. Elle doit changer lorsqu’une modification de contenu publié doit pouvoir être identifiée par le client. La première version publiée d’un jour utilise `YYYY-MM-DD`, puis les mises à jour supplémentaires du même jour utilisent un suffixe ordinal, par exemple `2026-10-03.1`, puis `2026-10-03.2`. Aucune comparaison SemVer n’est définie.
+Chaque fiche `games/<id>.json` est une définition V2 complète : `schemaVersion`, identité, joueurs, mode, capabilities, métadonnées éventuelles, `gameRules` et règles utilisateur. Elle peut utiliser `gameRules.type: standard` ou `declarative`. Le Catalogue valide la structure et les images ; l’application Flutter reste l’autorité finale pour l’adaptation exacte en `GameDefinition` et les règles déclaratives.
 
-`catalog.json` est un index minimal : chaque entrée autorise uniquement `id`, `name`, `path`, ainsi que `icon` et `image` facultatifs. Les contraintes de joueurs, l’âge minimum et toutes les autres propriétés fonctionnelles servent à la configuration/import et restent exclusivement dans `games/<id>.json`, qui est la source de vérité fonctionnelle. Cette séparation évite les duplications et les divergences, garde l’index léger et permet de charger la configuration complète uniquement lors de la sélection. `image` est volontairement dupliquée lorsqu’elle existe : l’index permet de charger l’illustration à la demande avant le détail, et le validateur impose une référence identique.
+`catalogVersion` est une chaîne opaque. Elle change lorsqu’un contenu publié change. La convention est `YYYY-MM-DD` pour la première publication d’une journée, puis `YYYY-MM-DD.1`, `.2`, etc. Aucune comparaison SemVer n’est définie.
+
+## Images
+
+Une image est facultative. Lorsqu’elle est publiée, elle doit être référencée par `image: "images/<id>.webp"`, être un WebP réel de 256×256 pixels et peser au maximum 100 KiB. Une taille inférieure à 50 KiB est recommandée. Le fallback visuel de l’application est utilisé en l’absence d’image.
+
+Les images source haute définition ne sont pas distribuées directement par le Catalogue. Elles doivent rester hors du dépôt. Les illustrations publiées doivent être originales ou utilisées avec les droits/licences appropriés ; les visuels commerciaux et les règles copiées intégralement ne doivent pas être ajoutés.
 
 ## Ajouter un jeu
 
-1. Créer `games/<id>.json` avec un identifiant lowercase kebab-case.
-2. Ajouter l’entrée correspondante dans `catalog.json`, avec `id`, `name` et `path: "games/<id>.json"`, plus seulement les métadonnées nécessaires à l’index (`icon` ou `image` si elles sont publiées).
-3. Ajouter éventuellement une illustration originale dans `images/<id>.webp` et référencer exactement ce même chemin dans `catalog.json` et `games/<id>.json`. Le fichier doit être un WebP de 256×256 pixels et peser au maximum 100 Ko ; une taille inférieure à 50 Ko est recommandée. L’image est facultative : l’application utilise son fallback lorsqu’elle est absente. Les images source haute définition ne sont pas destinées à être distribuées directement par le Catalogue. Le Catalogue est strict pour les nouvelles images WebP, tandis que l’application reste tolérante et peut lire les anciens PNG/JPEG.
-4. Mettre à jour `catalogVersion` si le contenu publié change.
-5. Lancer `python -m pip install -r requirements.txt`, puis `python scripts/validate_catalog.py`.
+1. Créer `games/<id>.json` avec une définition V2 complète.
+2. Ajouter dans `catalog.json` l’entrée d’index avec son `path` explicite.
+3. Choisir `standard` ou `declarative` selon le contrat existant ; ne pas inventer de nouveaux champs.
+4. Ajouter éventuellement `images/<id>.webp` et référencer le même chemin dans l’index et la fiche.
+5. Incrémenter `catalogVersion` lors de la publication.
+6. Exécuter la validation locale.
 
-Les illustrations doivent être originales ou utilisées avec les droits/licences appropriés. Ne pas copier les visuels commerciaux officiels ni reproduire intégralement les règles d’un éditeur ; les descriptions doivent rester originales et concises. N’ajouter aucun secret ni token.
+Le chargement de l’index ne télécharge pas les fiches. Lors de l’import, seule la fiche sélectionnée est téléchargée puis snapshotée dans le jeu local ; une modification ou suppression distante ne modifie donc pas une partie déjà importée. Les fiches ne disposent pas d’un cache métier distinct obligatoire : le cache existant peut servir de repli réseau, puis le snapshot local assure l’autonomie du jeu.
 
-Les contributions passent par une pull request. La CI vérifie les JSON, le schéma, les chemins, les doublons, les fichiers orphelins, les images référencées et la cohérence entre index et détail.
+Cette séparation garde `catalog.json` léger lorsque le Catalogue passe de quelques jeux à plusieurs dizaines ou centaines, sans embarquer toutes les règles métier dans chaque chargement de liste.
 
 ## Préparer une illustration
 
-Les mainteneurs peuvent préparer une source PNG, JPEG ou WebP carrée avec Pillow avant publication :
+Les mainteneurs peuvent convertir une source PNG, JPEG ou WebP carrée avec Pillow :
 
 ```sh
 python scripts/prepare_image.py ~/Desktop/scrabble.png scrabble
 ```
 
-Le script crée `images/scrabble.webp` en 256×256 pixels, avec une taille maximale de 100 Ko. Il vise une taille inférieure à 50 Ko, conserve la source intacte et refuse les sources non carrées ou plus petites que 256×256. Une destination existante est refusée par défaut ; utiliser `--force` pour la remplacer explicitement :
-
-```sh
-python scripts/prepare_image.py ~/Desktop/scrabble.png scrabble --force
-```
-
-Cette préparation ne modifie ni `catalog.json`, ni `games/<id>.json`, ni `catalogVersion`. Après vérification du rendu, ajouter explicitement la même référence `images/<id>.webp` dans les deux JSON et mettre à jour `catalogVersion` lors de la publication réelle. Conserver les sources haute définition hors des fichiers distribués.
+Le script produit `images/scrabble.webp` en 256×256 pixels, sans modifier la source. Une destination existante est refusée par défaut ; utiliser `--force` pour la remplacer explicitement.
 
 ## Validation locale
 
 ```sh
 python -m pip install -r requirements.txt
 python scripts/validate_catalog.py
+python -m unittest discover -s tests
 ```
 
-La validation ne nécessite ni Flutter, ni Dart, ni service réseau.
+La validation ne nécessite ni Flutter, ni Dart, ni service réseau. La CI GitHub exécute ces mêmes contrôles sur chaque `push` et `pull_request`.

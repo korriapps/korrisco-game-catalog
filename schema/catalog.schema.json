@@ -1,0 +1,217 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://catalog.korrisco.example/schema/catalog.schema.json",
+  "title": "KorriSco V2 catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "catalogVersion", "language", "games"],
+  "properties": {
+    "schemaVersion": {"const": 2},
+    "catalogVersion": {"type": "string", "minLength": 1},
+    "language": {"const": "fr"},
+    "games": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/gameIndex"},
+      "uniqueItems": true
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+    "players": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min"],
+      "properties": {
+        "min": {"type": "integer", "minimum": 1},
+        "max": {"type": ["integer", "null"], "minimum": 1}
+      }
+    },
+    "scoring": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["type", "inputMode"],
+          "properties": {
+            "type": {"const": "points"},
+            "inputMode": {"enum": ["scalar", "category", "point"]},
+            "categories": {"type": "array", "items": {"$ref": "#/$defs/category"}}
+          }
+        },
+        {"type": "object", "additionalProperties": false, "required": ["type"], "properties": {"type": {"const": "time"}}},
+        {"type": "object", "additionalProperties": false, "required": ["type"], "properties": {"type": {"const": "winLoss"}}},
+        {"type": "object", "additionalProperties": false, "required": ["type"], "properties": {"type": {"const": "ranking"}}},
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["type", "preset", "version"],
+          "properties": {
+            "type": {"const": "preset"}, "preset": {"type": "string", "minLength": 1},
+            "version": {"type": "integer", "minimum": 1}, "options": {"type": "object"}
+          }
+        }
+      ]
+    },
+    "category": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "label", "operation"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1}, "label": {"type": "string", "minLength": 1},
+        "operation": {"enum": ["add", "subtract"]}
+      }
+    },
+    "progression": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["type", "label", "count"],
+          "properties": {
+            "type": {"const": "rounds"}, "label": {"type": "string", "minLength": 1},
+            "count": {"type": ["integer", "null"], "minimum": 2, "maximum": 99}
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["type", "label", "setsToWin", "pointsToWin", "minimumLead"],
+          "properties": {
+            "type": {"const": "sets"}, "label": {"type": "string", "minLength": 1},
+            "setsToWin": {"type": "integer", "minimum": 1}, "pointsToWin": {"type": "integer", "minimum": 1},
+            "minimumLead": {"type": "integer", "minimum": 1}, "maximumPoints": {"type": ["integer", "null"]},
+            "decidingSet": {"$ref": "#/$defs/setParameters"}
+          }
+        }
+      ]
+    },
+    "setParameters": {
+      "type": "object", "additionalProperties": false,
+      "required": ["pointsToWin", "minimumLead"],
+      "properties": {"pointsToWin": {"type": "integer", "minimum": 1}, "minimumLead": {"type": "integer", "minimum": 1}, "maximumPoints": {"type": ["integer", "null"]}}
+    },
+    "victory": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false, "required": ["type", "direction", "tiePolicy"],
+          "properties": {"type": {"const": "ranking"}, "direction": {"enum": ["highest", "lowest", "shortest", "longest"]}, "tiePolicy": {"enum": ["shared", "manual", "forbidden"]}}
+        },
+        {
+          "type": "object", "additionalProperties": false, "required": ["type", "tiePolicy"],
+          "properties": {"type": {"const": "manualRanking"}, "tiePolicy": {"enum": ["shared", "manual", "forbidden"]}}
+        },
+        {
+          "type": "object", "additionalProperties": false, "required": ["type", "direction", "targetScore", "comparison", "tiePolicy"],
+          "properties": {"type": {"const": "target"}, "direction": {"enum": ["highest", "lowest"]}, "targetScore": {"type": "integer", "minimum": 1}, "comparison": {"enum": ["atLeast", "exact"]}, "tiePolicy": {"enum": ["shared", "manual", "forbidden"]}}
+        },
+        {
+          "type": "object", "additionalProperties": false, "required": ["type", "allowMultiple", "tiePolicy"],
+          "properties": {"type": {"const": "manual"}, "allowMultiple": {"type": "boolean"}, "tiePolicy": {"enum": ["shared", "manual", "forbidden"]}}
+        },
+        {"type": "object", "additionalProperties": false, "required": ["type", "winner"], "properties": {"type": {"const": "elimination"}, "winner": {"enum": ["lastActive", "manual"]}}},
+        {"type": "object", "additionalProperties": false, "required": ["type"], "properties": {"type": {"const": "sets"}}},
+        {"type": "object", "additionalProperties": false, "required": ["type"], "properties": {"type": {"const": "preset"}}}
+      ]
+    },
+    "standardRules": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "scoring", "victory"],
+      "properties": {"type": {"const": "standard"}, "scoring": {"$ref": "#/$defs/scoring"}, "progression": {"$ref": "#/$defs/progression"}, "victory": {"$ref": "#/$defs/victory"}, "elimination": {"$ref": "#/$defs/elimination"}}
+    },
+    "elimination": {
+      "type": "object", "additionalProperties": false, "required": ["mode", "simultaneous", "trackOrder", "reactivation"],
+      "properties": {"mode": {"enum": ["individual", "team"]}, "simultaneous": {"type": "boolean"}, "trackOrder": {"type": "boolean"}, "reactivation": {"type": "boolean"}}
+    },
+    "valueSource": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["type", "value"], "properties": {"type": {"const": "constant"}, "value": {"type": "integer"}}},
+        {"type": "object", "additionalProperties": false, "required": ["type", "parameter"], "properties": {"type": {"const": "parameter"}, "parameter": {"type": "string", "minLength": 1}}}
+      ]
+    },
+    "operation": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["type", "counter", "value"], "properties": {"type": {"enum": ["add", "subtract", "set"]}, "counter": {"type": "string", "minLength": 1}, "value": {"$ref": "#/$defs/valueSource"}, "participantParameter": {"type": ["string", "null"]}}},
+        {"type": "object", "additionalProperties": false, "required": ["type", "participantParameter"], "properties": {"type": {"const": "eliminate"}, "participantParameter": {"type": "string", "minLength": 1}}}
+      ]
+    },
+    "declarativeDefinition": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schemaVersion", "counters", "actions", "targets", "transitions"],
+      "properties": {
+        "schemaVersion": {"enum": [4, 5]},
+        "counters": {"type": "array", "items": {"$ref": "#/$defs/counter"}},
+        "actions": {"type": "array", "items": {"$ref": "#/$defs/action"}},
+        "targets": {"type": "array", "items": {"$ref": "#/$defs/target"}},
+        "transitions": {"type": "array", "items": {"$ref": "#/$defs/transition"}},
+        "outcome": {"$ref": "#/$defs/outcome"}
+      }
+    },
+    "counter": {
+      "type": "object", "additionalProperties": false, "required": ["id", "initialValue", "scope"],
+      "properties": {"id": {"type": "string", "minLength": 1}, "initialValue": {"type": "integer"}, "minimum": {"type": ["integer", "null"]}, "maximum": {"type": ["integer", "null"]}, "scope": {"enum": ["participant", "global"]}}
+    },
+    "parameter": {
+      "type": "object", "additionalProperties": false, "required": ["id", "type"],
+      "properties": {"id": {"type": "string", "minLength": 1}, "type": {"enum": ["integer", "participant", "boolean"]}, "minValue": {"type": ["integer", "null"]}, "maxValue": {"type": ["integer", "null"]}}
+    },
+    "action": {
+      "type": "object", "additionalProperties": false, "required": ["id", "parameters", "operations"],
+      "properties": {"id": {"type": "string", "minLength": 1}, "parameters": {"type": "array", "items": {"$ref": "#/$defs/parameter"}}, "operations": {"type": "array", "items": {"$ref": "#/$defs/operation"}}}
+    },
+    "target": {
+      "type": "object", "additionalProperties": false, "required": ["id", "counter", "comparison", "value"],
+      "properties": {"id": {"type": "string", "minLength": 1}, "counter": {"type": "string", "minLength": 1}, "comparison": {"enum": ["atLeast", "atMost", "exact"]}, "value": {"type": "integer"}}
+    },
+    "outcome": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["type", "target"], "properties": {"type": {"const": "targetReached"}, "target": {"type": "string", "minLength": 1}}},
+        {"type": "object", "additionalProperties": false, "required": ["type"], "properties": {"type": {"const": "lastActive"}}}
+      ]
+    },
+    "condition": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["type", "counter", "comparison", "value"], "properties": {"type": {"const": "counter"}, "counter": {"type": "string", "minLength": 1}, "comparison": {"enum": ["equal", "notEqual", "greaterThan", "greaterThanOrEqual", "lessThan", "lessThanOrEqual"]}, "value": {"type": "integer"}}},
+        {"type": "object", "additionalProperties": false, "required": ["type", "parameter", "comparison", "value"], "properties": {"type": {"const": "actionParameter"}, "parameter": {"type": "string", "minLength": 1}, "comparison": {"enum": ["equal", "notEqual", "greaterThan", "greaterThanOrEqual", "lessThan", "lessThanOrEqual"]}, "value": {"type": "integer"}}}
+      ]
+    },
+    "transition": {
+      "type": "object", "additionalProperties": false, "required": ["id", "afterActions", "condition", "operations", "phase"],
+      "properties": {"id": {"type": "string", "minLength": 1}, "afterActions": {"type": "array", "items": {"type": "string", "minLength": 1}}, "condition": {"$ref": "#/$defs/condition"}, "operations": {"type": "array", "items": {"$ref": "#/$defs/operation"}}, "phase": {"enum": ["afterAction", "consequence"]}, "participantSource": {"$ref": "#/$defs/participantSource"}}
+    },
+    "participantSource": {"type": "object", "additionalProperties": false, "required": ["type", "parameter"], "properties": {"type": {"const": "actionParameter"}, "parameter": {"type": "string", "minLength": 1}}},
+    "presentationParameter": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["type", "parameterId", "label"], "properties": {"type": {"const": "integer"}, "parameterId": {"type": "string", "minLength": 1}, "label": {"type": "string", "minLength": 1}, "suggestedValue": {"type": ["integer", "null"]}, "step": {"type": ["integer", "null"]}}},
+        {"type": "object", "additionalProperties": false, "required": ["type", "parameterId", "label"], "properties": {"type": {"enum": ["participant", "boolean"]}, "parameterId": {"type": "string", "minLength": 1}, "label": {"type": "string", "minLength": 1}}}
+      ]
+    },
+    "presentation": {
+      "type": "object", "additionalProperties": false, "required": ["actions"],
+      "properties": {"actions": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["actionId", "label", "order", "emphasis", "parameters"], "properties": {"actionId": {"type": "string", "minLength": 1}, "label": {"type": "string", "minLength": 1}, "order": {"type": "integer"}, "emphasis": {"enum": ["primary", "secondary"]}, "helpText": {"type": ["string", "null"]}, "parameters": {"type": "array", "items": {"$ref": "#/$defs/presentationParameter"}}}}}}
+    },
+    "declarativeRules": {
+      "type": "object", "additionalProperties": false, "required": ["type", "definition"],
+      "properties": {"type": {"const": "declarative"}, "definition": {"$ref": "#/$defs/declarativeDefinition"}, "presentation": {"$ref": "#/$defs/presentation"}}
+    },
+    "gameRules": {"oneOf": [{"$ref": "#/$defs/standardRules"}, {"$ref": "#/$defs/declarativeRules"}]},
+    "gameIndex": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "name", "path", "players", "playMode", "requiredCapabilities"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"}, "name": {"type": "string", "minLength": 1},
+        "path": {"type": "string", "pattern": "^games/[a-z0-9]+(?:-[a-z0-9]+)*\\.json$"},
+        "players": {"$ref": "#/$defs/players"}, "playMode": {"enum": ["individual", "teams"]},
+        "requiredCapabilities": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "icon": {"type": "string", "minLength": 1},
+        "image": {"type": "string", "pattern": "^images/[a-z0-9]+(?:-[a-z0-9]+)*\\.webp$"},
+        "minimumAge": {"type": "integer", "minimum": 1}
+      }
+    },
+    "gameDetail": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schemaVersion", "id", "name", "players", "playMode", "requiredCapabilities", "gameRules"],
+      "properties": {
+        "schemaVersion": {"const": 2},
+        "id": {"$ref": "#/$defs/id"}, "name": {"type": "string", "minLength": 1}, "players": {"$ref": "#/$defs/players"},
+        "playMode": {"enum": ["individual", "teams"]}, "requiredCapabilities": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "gameRules": {"$ref": "#/$defs/gameRules"}, "icon": {"type": "string", "minLength": 1},
+        "image": {"type": "string", "pattern": "^images/[a-z0-9]+(?:-[a-z0-9]+)*\\.webp$"}, "minimumAge": {"type": "integer", "minimum": 1}, "rules": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}
