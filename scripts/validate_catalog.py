@@ -135,6 +135,8 @@ def _derived_capabilities(definition: dict) -> set[str]:
         for parameter in action.get("parameters", [])
     ):
         capabilities.add("action.integerBounds.v1")
+    if definition.get("ranking") is not None:
+        capabilities.add("ranking.v1")
     return capabilities
 
 
@@ -227,7 +229,29 @@ def validate_game_detail(
         if capabilities:
             fail(f"{relative}.requiredCapabilities", "standard games must declare an empty array")
     else:
-        derived = _derived_capabilities(rules["definition"])
+        definition = rules["definition"]
+        if "ranking" in definition and definition["schemaVersion"] != 6:
+            fail(
+                f"{relative}.gameRules.definition.ranking",
+                "ranking requires declarative definition schemaVersion 6",
+            )
+        ranking = definition.get("ranking")
+        if ranking is not None:
+            source = ranking["source"]
+            counter_id = source["counterId"]
+            counters = {counter["id"]: counter for counter in definition["counters"]}
+            counter = counters.get(counter_id)
+            if counter is None:
+                fail(
+                    f"{relative}.gameRules.definition.ranking.source.counterId",
+                    f"unknown participant counter {counter_id!r}",
+                )
+            if counter["scope"] != "participant":
+                fail(
+                    f"{relative}.gameRules.definition.ranking.source.counterId",
+                    "ranking source must reference a participant counter",
+                )
+        derived = _derived_capabilities(definition)
         if capabilities != derived:
             fail(
                 f"{relative}.requiredCapabilities",

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "catalogVersion": "2026-10-09.3",
+  "catalogVersion": "2026-10-09.4",
   "language": "fr",
   "games": [
     {
@@ -48,6 +48,7 @@
       "requiredCapabilities": [
         "counter.v1",
         "action.v1",
+        "ranking.v1",
         "action.counter.add.v1",
         "target.v1",
         "outcome.targetReached.v1",

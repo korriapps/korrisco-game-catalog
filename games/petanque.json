@@ -7,6 +7,7 @@
   "requiredCapabilities": [
     "counter.v1",
     "action.v1",
+    "ranking.v1",
     "action.counter.add.v1",
     "target.v1",
     "outcome.targetReached.v1",
@@ -16,7 +17,7 @@
   "gameRules": {
     "type": "declarative",
     "definition": {
-      "schemaVersion": 5,
+      "schemaVersion": 6,
       "counters": [
         {"id": "points", "initialValue": 0, "scope": "participant"}
       ],
@@ -41,7 +42,13 @@
         {"id": "thirteen", "counter": "points", "comparison": "atLeast", "value": 13}
       ],
       "transitions": [],
-      "outcome": {"type": "targetReached", "target": "thirteen"}
+      "outcome": {"type": "targetReached", "target": "thirteen"},
+      "ranking": {
+        "source": {"type": "participantCounter", "counterId": "points"},
+        "direction": "descending",
+        "tiePolicy": "competition",
+        "eliminatedPolicy": "include"
+      }
     },
     "presentation": {
       "actions": [

@@ -147,6 +147,98 @@ class CatalogValidationTests(unittest.TestCase):
         self.write_catalog([entry])
         self.validate()
 
+    def test_valid_v6_ranking_declarative_catalog(self):
+        definition = {
+            "schemaVersion": 6,
+            "counters": [{"id": "points", "initialValue": 0, "scope": "participant"}],
+            "actions": [], "targets": [], "transitions": [],
+            "ranking": {
+                "source": {"type": "participantCounter", "counterId": "points"},
+                "direction": "descending", "tiePolicy": "competition",
+                "eliminatedPolicy": "include",
+            },
+        }
+        entry = {
+            "id": "ranking-game", "name": "Ranking game", "players": {"min": 2},
+            "playMode": "individual", "requiredCapabilities": ["counter.v1", "ranking.v1"],
+            "gameRules": {"type": "declarative", "definition": definition},
+        }
+        self.write_catalog([entry])
+        self.validate()
+
+    def test_ranking_requires_existing_participant_counter(self):
+        definition = {
+            "schemaVersion": 6, "counters": [], "actions": [], "targets": [],
+            "transitions": [], "ranking": {
+                "source": {"type": "participantCounter", "counterId": "missing"},
+                "direction": "descending", "tiePolicy": "competition", "eliminatedPolicy": "include",
+            },
+        }
+        self.write_catalog([{
+            "id": "ranking-game", "name": "Ranking", "players": {"min": 2},
+            "playMode": "individual", "requiredCapabilities": ["ranking.v1"],
+            "gameRules": {"type": "declarative", "definition": definition},
+        }])
+        self.assert_invalid()
+
+    def test_ranking_rejects_global_counter(self):
+        definition = {
+            "schemaVersion": 6,
+            "counters": [{"id": "total", "initialValue": 0, "scope": "global"}],
+            "actions": [], "targets": [], "transitions": [],
+            "ranking": {
+                "source": {"type": "participantCounter", "counterId": "total"},
+                "direction": "descending", "tiePolicy": "competition", "eliminatedPolicy": "include",
+            },
+        }
+        self.write_catalog([{
+            "id": "ranking-game", "name": "Ranking", "players": {"min": 2},
+            "playMode": "individual", "requiredCapabilities": ["counter.global.v1", "ranking.v1"],
+            "gameRules": {"type": "declarative", "definition": definition},
+        }])
+        self.assert_invalid()
+
+    def test_ranking_requires_schema_v6_and_capability(self):
+        definition = {
+            "schemaVersion": 6,
+            "counters": [{"id": "score", "initialValue": 0, "scope": "participant"}],
+            "actions": [], "targets": [], "transitions": [],
+            "ranking": {
+                "source": {"type": "participantCounter", "counterId": "score"},
+                "direction": "descending", "tiePolicy": "competition", "eliminatedPolicy": "include",
+            },
+        }
+        self.write_catalog([{
+            "id": "ranking-game", "name": "Ranking", "players": {"min": 2},
+            "playMode": "individual", "requiredCapabilities": ["counter.v1"],
+            "gameRules": {"type": "declarative", "definition": definition},
+        }])
+        self.assert_invalid()
+        definition["schemaVersion"] = 5
+        self.write_catalog([{
+            "id": "ranking-game", "name": "Ranking", "players": {"min": 2},
+            "playMode": "individual", "requiredCapabilities": ["counter.v1", "ranking.v1"],
+            "gameRules": {"type": "declarative", "definition": definition},
+        }])
+        self.assert_invalid()
+
+    def test_ranking_enum_values_are_strict(self):
+        definition = {
+            "schemaVersion": 6,
+            "counters": [{"id": "score", "initialValue": 0, "scope": "participant"}],
+            "actions": [], "targets": [], "transitions": [],
+            "ranking": {
+                "source": {"type": "participantCounter", "counterId": "score"},
+                "direction": "highest", "tiePolicy": "shared", "eliminatedPolicy": "keep",
+            },
+        }
+        self.write_catalog([{
+            "id": "ranking-game", "name": "Ranking", "players": {"min": 2},
+            "playMode": "individual", "requiredCapabilities": ["counter.v1", "ranking.v1"],
+            "gameRules": {"type": "declarative", "definition": definition},
+        }])
+        self.assert_invalid()
+
     def test_image_is_optional_and_valid_image_is_accepted(self):
         entry = self.standard_entry(image="images/test-game.webp")
         self.write_catalog([entry])

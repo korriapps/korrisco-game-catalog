@@ -133,13 +133,19 @@
       "type": "object", "additionalProperties": false,
       "required": ["schemaVersion", "counters", "actions", "targets", "transitions"],
       "properties": {
-        "schemaVersion": {"enum": [4, 5]},
+        "schemaVersion": {"enum": [4, 5, 6]},
         "counters": {"type": "array", "items": {"$ref": "#/$defs/counter"}},
         "actions": {"type": "array", "items": {"$ref": "#/$defs/action"}},
         "targets": {"type": "array", "items": {"$ref": "#/$defs/target"}},
         "transitions": {"type": "array", "items": {"$ref": "#/$defs/transition"}},
-        "outcome": {"$ref": "#/$defs/outcome"}
-      }
+        "outcome": {"$ref": "#/$defs/outcome"},
+        "ranking": {"$ref": "#/$defs/ranking"}
+      },
+      "allOf": [{
+        "if": {"properties": {"schemaVersion": {"const": 6}}, "required": ["schemaVersion"]},
+        "then": {},
+        "else": {"not": {"required": ["ranking"]}}
+      }]
     },
     "counter": {
       "type": "object", "additionalProperties": false, "required": ["id", "initialValue", "scope"],
@@ -162,6 +168,21 @@
         {"type": "object", "additionalProperties": false, "required": ["type", "target"], "properties": {"type": {"const": "targetReached"}, "target": {"type": "string", "minLength": 1}}},
         {"type": "object", "additionalProperties": false, "required": ["type"], "properties": {"type": {"const": "lastActive"}}}
       ]
+    },
+    "rankingSource": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "counterId"],
+      "properties": {"type": {"const": "participantCounter"}, "counterId": {"type": "string", "minLength": 1}}
+    },
+    "ranking": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source", "direction", "tiePolicy", "eliminatedPolicy"],
+      "properties": {
+        "source": {"$ref": "#/$defs/rankingSource"},
+        "direction": {"enum": ["ascending", "descending"]},
+        "tiePolicy": {"const": "competition"},
+        "eliminatedPolicy": {"enum": ["include", "exclude"]}
+      }
     },
     "condition": {
       "oneOf": [
