@@ -7,6 +7,7 @@
     {"id": "doublette", "label": "Doublette", "campCount": 2, "playersPerCamp": 2},
     {"id": "triplette", "label": "Triplette", "campCount": 2, "playersPerCamp": 3}
   ],
+  "defaultCompositionFormatId": "doublette",
   "requiredCapabilities": [
     "counter.v1",
     "action.v1",

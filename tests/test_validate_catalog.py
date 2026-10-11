@@ -62,7 +62,7 @@ class CatalogValidationTests(unittest.TestCase):
             index_entries.append({
                 key: entry[key]
                 for key in (
-                    "id", "name", "players", "playMode", "compositionFormats", "requiredCapabilities",
+                    "id", "name", "players", "playMode", "compositionFormats", "defaultCompositionFormatId", "requiredCapabilities",
                     "icon", "image", "minimumAge",
                 )
                 if key in entry
@@ -98,6 +98,7 @@ class CatalogValidationTests(unittest.TestCase):
                 {"id": "doublette", "label": "Doublette", "campCount": 2, "playersPerCamp": 2},
                 {"id": "triplette", "label": "Triplette", "campCount": 2, "playersPerCamp": 3},
             ],
+            "defaultCompositionFormatId": "doublette",
             "requiredCapabilities": [],
             "gameRules": {
                 "type": "standard",
@@ -289,6 +290,7 @@ class CatalogValidationTests(unittest.TestCase):
         self.assertNotIn("players", detail)
         self.assertNotIn("playMode", detail)
         for source in (entry, detail):
+            self.assertEqual(source["defaultCompositionFormatId"], "doublette")
             formats = {item["id"]: item for item in source["compositionFormats"]}
             self.assertEqual(set(formats), set(expected))
             for format_id, (label, camp_count, players_per_camp) in expected.items():
@@ -320,6 +322,22 @@ class CatalogValidationTests(unittest.TestCase):
             with self.subTest(formats=formats):
                 self.write_catalog([self.formats_entry(compositionFormats=formats)])
                 self.assert_invalid()
+
+    def test_default_format_must_exist_and_match(self):
+        self.write_catalog([self.formats_entry(defaultCompositionFormatId="unknown")])
+        self.assert_invalid()
+        self.write_catalog([self.formats_entry(defaultCompositionFormatId="")])
+        self.assert_invalid()
+        self.write_catalog([self.formats_entry(defaultCompositionFormatId="doublette")])
+        detail_path = self.root / "games/format-game.json"
+        detail = json.loads(detail_path.read_text(encoding="utf-8"))
+        detail["defaultCompositionFormatId"] = "individual"
+        detail_path.write_text(json.dumps(detail), encoding="utf-8")
+        self.assert_invalid()
+
+    def test_default_format_is_rejected_for_classic_entries(self):
+        self.write_catalog([self.standard_entry(defaultCompositionFormatId="individual")])
+        self.assert_invalid()
 
     def test_format_participation_rejects_classic_fields_and_v2_detail(self):
         entry = self.formats_entry(players={"min": 2, "max": 6}, playMode="teams")

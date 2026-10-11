@@ -168,6 +168,15 @@ def _validate_composition_formats(value: object, *, field: str) -> list[dict]:
     return formats
 
 
+def _validate_default_format_id(
+    value: object, formats: list[dict], *, field: str
+) -> None:
+    if not isinstance(value, str) or not value.strip():
+        fail(field, "must be a non-empty string")
+    if value not in {composition["id"] for composition in formats}:
+        fail(field, f"must reference an existing composition format: {value!r}")
+
+
 def validate_catalog(catalog: dict, schema: dict) -> None:
     errors = sorted(Draft202012Validator(schema).iter_errors(catalog), key=lambda error: list(error.path))
     if errors:
@@ -199,10 +208,21 @@ def validate_catalog(catalog: dict, schema: dict) -> None:
         referenced_game_paths.add(detail_path.resolve())
         validate_game_detail(detail, schema, entry, entry_path, detail_path)
         if "compositionFormats" in entry:
-            _validate_composition_formats(
+            formats = _validate_composition_formats(
                 entry["compositionFormats"], field=f"{entry_path}.compositionFormats"
             )
+            if "defaultCompositionFormatId" in entry:
+                _validate_default_format_id(
+                    entry["defaultCompositionFormatId"],
+                    formats,
+                    field=f"{entry_path}.defaultCompositionFormatId",
+                )
         else:
+            if "defaultCompositionFormatId" in entry:
+                fail(
+                    f"{entry_path}.defaultCompositionFormatId",
+                    "is only valid with compositionFormats",
+                )
             players = entry["players"]
             if players.get("max") is not None and players["max"] < players["min"]:
                 fail(f"{entry_path}.players", "max must be greater than or equal to min")
@@ -262,12 +282,27 @@ def validate_game_detail(
         detail_formats = _validate_composition_formats(
             detail["compositionFormats"], field=f"{relative}.compositionFormats"
         )
+        if "defaultCompositionFormatId" in entry:
+            _validate_default_format_id(
+                entry["defaultCompositionFormatId"],
+                index_formats,
+                field="catalog.json.defaultCompositionFormatId",
+            )
+            if detail.get("defaultCompositionFormatId") != entry["defaultCompositionFormatId"]:
+                fail(
+                    relative,
+                    "defaultCompositionFormatId does not match catalog index",
+                )
+        elif "defaultCompositionFormatId" in detail:
+            fail(relative, "defaultCompositionFormatId does not match catalog index")
         if index_formats != detail_formats:
             fail(
                 relative,
                 f"compositionFormats does not match catalog index: index={index_formats!r}, detail={detail_formats!r}",
             )
     else:
+        if "defaultCompositionFormatId" in detail:
+            fail(relative, "defaultCompositionFormatId is only valid with compositionFormats")
         for key in ("players", "playMode"):
             if entry.get(key) != detail.get(key):
                 fail(

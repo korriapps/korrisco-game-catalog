@@ -232,13 +232,14 @@
         "path": {"type": "string", "pattern": "^games/[a-z0-9]+(?:-[a-z0-9]+)*\\.json$"},
         "players": {"$ref": "#/$defs/players"}, "playMode": {"enum": ["individual", "teams"]},
         "compositionFormats": {"$ref": "#/$defs/compositionFormats"},
+        "defaultCompositionFormatId": {"type": "string", "minLength": 1},
         "requiredCapabilities": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
         "icon": {"type": "string", "minLength": 1},
         "image": {"type": "string", "pattern": "^images/[a-z0-9]+(?:-[a-z0-9]+)*\\.webp$"},
         "minimumAge": {"type": "integer", "minimum": 1}
       },
       "oneOf": [
-        {"required": ["players", "playMode"], "not": {"required": ["compositionFormats"]}},
+        {"required": ["players", "playMode"], "not": {"anyOf": [{"required": ["compositionFormats"]}, {"required": ["defaultCompositionFormatId"]}]}},
         {"required": ["compositionFormats"], "not": {"anyOf": [{"required": ["players"]}, {"required": ["playMode"]}]}}
       ]
     },
@@ -248,12 +249,12 @@
       "properties": {
         "schemaVersion": {"enum": [2, 3]},
         "id": {"$ref": "#/$defs/id"}, "name": {"type": "string", "minLength": 1}, "players": {"$ref": "#/$defs/players"},
-        "playMode": {"enum": ["individual", "teams"]}, "compositionFormats": {"$ref": "#/$defs/compositionFormats"}, "requiredCapabilities": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "playMode": {"enum": ["individual", "teams"]}, "compositionFormats": {"$ref": "#/$defs/compositionFormats"}, "defaultCompositionFormatId": {"type": "string", "minLength": 1}, "requiredCapabilities": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
         "gameRules": {"$ref": "#/$defs/gameRules"}, "icon": {"type": "string", "minLength": 1},
         "image": {"type": "string", "pattern": "^images/[a-z0-9]+(?:-[a-z0-9]+)*\\.webp$"}, "minimumAge": {"type": "integer", "minimum": 1}, "rules": {"type": "string", "minLength": 1}
       },
       "oneOf": [
-        {"required": ["players", "playMode"], "not": {"required": ["compositionFormats"]}},
+        {"required": ["players", "playMode"], "not": {"anyOf": [{"required": ["compositionFormats"]}, {"required": ["defaultCompositionFormatId"]}]}},
         {"required": ["schemaVersion", "compositionFormats"], "properties": {"schemaVersion": {"const": 3}}, "not": {"anyOf": [{"required": ["players"]}, {"required": ["playMode"]}]}}
       ]
     }
