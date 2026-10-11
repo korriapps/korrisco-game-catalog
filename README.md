@@ -2,11 +2,11 @@
 
 Catalogue public officiel de configurations de jeux pour KorriSco. Le dépôt est autonome : l’application le consomme en lecture seule, puis chaque jeu importé devient une copie locale indépendante.
 
-## Contrat V2
+## Contrat V3
 
-`catalog.json` est l’index V2 publié et utilise `schemaVersion: 2`. Il contient uniquement les métadonnées nécessaires à l’affichage, à la recherche, au tri, à la compatibilité et à la localisation de la fiche détaillée. Une fiche est chargée uniquement lorsqu’un jeu est sélectionné/importé.
+`catalog.json` est l’index V3 publié et utilise `schemaVersion: 3`. Il contient uniquement les métadonnées nécessaires à l’affichage, à la recherche, au tri, à la compatibilité et à la localisation de la fiche détaillée. Une fiche est chargée uniquement lorsqu’un jeu est sélectionné/importé. Le catalogue peut contenir des fiches V2 classiques et des fiches V3 à formats.
 
-Chaque entrée contient au minimum :
+Chaque entrée classique contient au minimum :
 
 - `id` : identifiant lowercase kebab-case ASCII ;
 - `name` ;
@@ -15,9 +15,11 @@ Chaque entrée contient au minimum :
 - `playMode` (`individual` ou `teams`) ;
 - `requiredCapabilities`.
 
+Une entrée classique utilise `players` et `playMode`. Une entrée à formats utilise à la place un tableau `compositionFormats` non vide ; ces deux branches sont exclusives. Chaque format contient `id`, `label`, `campCount` et `playersPerCamp`. Les bornes physiques sont dérivées des formats et ne sont pas recopiées dans `players`.
+
 Les métadonnées facultatives d’index sont `icon`, `image` et `minimumAge`. Les règles utilisateur et `gameRules` appartiennent exclusivement à la fiche `games/<id>.json`. Les métadonnées répétées dans l’index et la fiche sont contrôlées par le validateur afin d’éviter les divergences.
 
-Chaque fiche `games/<id>.json` est une définition V2 complète : `schemaVersion`, identité, joueurs, mode, capabilities, métadonnées éventuelles, `gameRules` et règles utilisateur. Elle peut utiliser `gameRules.type: standard` ou `declarative`. Le Catalogue valide la structure et les images ; l’application Flutter reste l’autorité finale pour l’adaptation exacte en `GameDefinition` et les règles déclaratives.
+Chaque fiche `games/<id>.json` est une définition complète. Les fiches classiques restent en V2 ; une fiche à formats utilise `schemaVersion: 3` et `compositionFormats` sans `players` ni `playMode`. Elle peut utiliser `gameRules.type: standard` ou `declarative`. Le Catalogue valide la structure et les images ; l’application Flutter reste l’autorité finale pour l’adaptation exacte en `GameDefinition` et les règles déclaratives.
 
 `catalogVersion` est une chaîne opaque. Elle change lorsqu’un contenu publié change. La convention est `YYYY-MM-DD` pour la première publication d’une journée, puis `YYYY-MM-DD.1`, `.2`, etc. Aucune comparaison SemVer n’est définie.
 

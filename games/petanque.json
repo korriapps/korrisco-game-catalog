@@ -1,9 +1,12 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "id": "petanque",
   "name": "Pétanque",
-  "players": {"min": 2, "max": 2},
-  "playMode": "teams",
+  "compositionFormats": [
+    {"id": "individual", "label": "Individuel", "campCount": 2, "playersPerCamp": 1},
+    {"id": "doublette", "label": "Doublette", "campCount": 2, "playersPerCamp": 2},
+    {"id": "triplette", "label": "Triplette", "campCount": 2, "playersPerCamp": 3}
+  ],
   "requiredCapabilities": [
     "counter.v1",
     "action.v1",

@@ -62,13 +62,13 @@ class CatalogValidationTests(unittest.TestCase):
             index_entries.append({
                 key: entry[key]
                 for key in (
-                    "id", "name", "players", "playMode", "requiredCapabilities",
+                    "id", "name", "players", "playMode", "compositionFormats", "requiredCapabilities",
                     "icon", "image", "minimumAge",
                 )
                 if key in entry
             } | {"path": f"games/{entry['id']}.json"})
         catalog = {
-            "schemaVersion": 2,
+            "schemaVersion": 3,
             "catalogVersion": "test",
             "language": "fr",
             "games": index_entries,
@@ -87,6 +87,26 @@ class CatalogValidationTests(unittest.TestCase):
     def assert_invalid(self):
         with self.assertRaises(validate_catalog.ValidationFailure):
             self.validate()
+
+    def formats_entry(self, **overrides):
+        entry = {
+            "schemaVersion": 3,
+            "id": "format-game",
+            "name": "Format game",
+            "compositionFormats": [
+                {"id": "individual", "label": "Individuel", "campCount": 2, "playersPerCamp": 1},
+                {"id": "doublette", "label": "Doublette", "campCount": 2, "playersPerCamp": 2},
+                {"id": "triplette", "label": "Triplette", "campCount": 2, "playersPerCamp": 3},
+            ],
+            "requiredCapabilities": [],
+            "gameRules": {
+                "type": "standard",
+                "scoring": {"type": "points", "inputMode": "scalar"},
+                "victory": {"type": "ranking", "direction": "highest", "tiePolicy": "shared"},
+            },
+        }
+        entry.update(overrides)
+        return entry
 
     def test_valid_v2_standard_catalog(self):
         self.write_catalog()
@@ -245,11 +265,73 @@ class CatalogValidationTests(unittest.TestCase):
         self.write_webp(self.root / "images/test-game.webp")
         self.validate()
 
-    def test_schema_version_must_be_two(self):
+    def test_schema_version_must_be_three(self):
         self.write_catalog()
         catalog = json.loads((self.root / "catalog.json").read_text())
-        catalog["schemaVersion"] = 1
+        catalog["schemaVersion"] = 2
         (self.root / "catalog.json").write_text(json.dumps(catalog))
+        self.assert_invalid()
+
+    def test_classic_and_format_entries_coexist(self):
+        self.write_catalog([self.standard_entry(), self.formats_entry()])
+        self.validate()
+
+    def test_real_petanque_uses_v3_composition_formats(self):
+        catalog = json.loads((REPOSITORY_ROOT / "catalog.json").read_text(encoding="utf-8"))
+        entry = next(game for game in catalog["games"] if game["id"] == "petanque")
+        detail = json.loads((REPOSITORY_ROOT / entry["path"]).read_text(encoding="utf-8"))
+        expected = {
+            "individual": ("Individuel", 2, 1),
+            "doublette": ("Doublette", 2, 2),
+            "triplette": ("Triplette", 2, 3),
+        }
+        self.assertEqual(detail["schemaVersion"], 3)
+        self.assertNotIn("players", detail)
+        self.assertNotIn("playMode", detail)
+        for source in (entry, detail):
+            formats = {item["id"]: item for item in source["compositionFormats"]}
+            self.assertEqual(set(formats), set(expected))
+            for format_id, (label, camp_count, players_per_camp) in expected.items():
+                self.assertEqual(
+                    (formats[format_id]["label"], formats[format_id]["campCount"], formats[format_id]["playersPerCamp"]),
+                    (label, camp_count, players_per_camp),
+                )
+
+    def test_format_metadata_must_match_between_index_and_detail(self):
+        self.write_catalog([self.formats_entry()])
+        detail_path = self.root / "games/format-game.json"
+        detail = json.loads(detail_path.read_text(encoding="utf-8"))
+        detail["schemaVersion"] = 3
+        detail["compositionFormats"][0]["playersPerCamp"] = 2
+        detail_path.write_text(json.dumps(detail), encoding="utf-8")
+        self.assert_invalid()
+
+    def test_invalid_composition_formats_are_rejected(self):
+        invalid_values = [
+            [],
+            [{"id": "", "label": "Label", "campCount": 2, "playersPerCamp": 1}],
+            [{"id": "same", "label": "One", "campCount": 2, "playersPerCamp": 1},
+             {"id": "same", "label": "Two", "campCount": 2, "playersPerCamp": 1}],
+            [{"id": "id", "label": "", "campCount": 2, "playersPerCamp": 1}],
+            [{"id": "id", "label": "Label", "campCount": 1, "playersPerCamp": 1}],
+            [{"id": "id", "label": "Label", "campCount": 2, "playersPerCamp": 0}],
+        ]
+        for formats in invalid_values:
+            with self.subTest(formats=formats):
+                self.write_catalog([self.formats_entry(compositionFormats=formats)])
+                self.assert_invalid()
+
+    def test_format_participation_rejects_classic_fields_and_v2_detail(self):
+        entry = self.formats_entry(players={"min": 2, "max": 6}, playMode="teams")
+        self.write_catalog([entry])
+        self.assert_invalid()
+
+        entry = self.formats_entry()
+        self.write_catalog([entry])
+        detail_path = self.root / "games/format-game.json"
+        detail = json.loads(detail_path.read_text(encoding="utf-8"))
+        detail["schemaVersion"] = 2
+        detail_path.write_text(json.dumps(detail), encoding="utf-8")
         self.assert_invalid()
 
     def test_duplicate_ids_are_rejected(self):

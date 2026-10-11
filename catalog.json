@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 2,
-  "catalogVersion": "2026-10-09.4",
+  "schemaVersion": 3,
+  "catalogVersion": "2026-10-11.1",
   "language": "fr",
   "games": [
     {
@@ -43,8 +43,11 @@
       "id": "petanque",
       "name": "Pétanque",
       "path": "games/petanque.json",
-      "players": {"min": 2, "max": 2},
-      "playMode": "teams",
+      "compositionFormats": [
+        {"id": "individual", "label": "Individuel", "campCount": 2, "playersPerCamp": 1},
+        {"id": "doublette", "label": "Doublette", "campCount": 2, "playersPerCamp": 2},
+        {"id": "triplette", "label": "Triplette", "campCount": 2, "playersPerCamp": 3}
+      ],
       "requiredCapabilities": [
         "counter.v1",
         "action.v1",

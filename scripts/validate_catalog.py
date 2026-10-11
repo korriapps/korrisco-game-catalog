@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the public KorriSco V2 catalog without requiring Flutter."""
+"""Validate the public KorriSco V3 catalog without requiring Flutter."""
 
 from __future__ import annotations
 
@@ -140,6 +140,34 @@ def _derived_capabilities(definition: dict) -> set[str]:
     return capabilities
 
 
+def _validate_composition_formats(value: object, *, field: str) -> list[dict]:
+    if not isinstance(value, list) or not value:
+        fail(field, "must be a non-empty array")
+    formats: list[dict] = []
+    ids: set[str] = set()
+    for index, composition in enumerate(value):
+        location = f"{field}[{index}]"
+        if not isinstance(composition, dict):
+            fail(location, "must be an object")
+        format_id = composition.get("id")
+        label = composition.get("label")
+        camp_count = composition.get("campCount")
+        players_per_camp = composition.get("playersPerCamp")
+        if not isinstance(format_id, str) or not format_id.strip():
+            fail(f"{location}.id", "must be a non-empty string")
+        if format_id in ids:
+            fail(f"{location}.id", f"duplicate composition format id {format_id}")
+        ids.add(format_id)
+        if not isinstance(label, str) or not label.strip():
+            fail(f"{location}.label", "must be a non-empty string")
+        if not isinstance(camp_count, int) or isinstance(camp_count, bool) or camp_count < 2:
+            fail(f"{location}.campCount", "must be an integer greater than or equal to 2")
+        if not isinstance(players_per_camp, int) or isinstance(players_per_camp, bool) or players_per_camp < 1:
+            fail(f"{location}.playersPerCamp", "must be an integer greater than or equal to 1")
+        formats.append(composition)
+    return formats
+
+
 def validate_catalog(catalog: dict, schema: dict) -> None:
     errors = sorted(Draft202012Validator(schema).iter_errors(catalog), key=lambda error: list(error.path))
     if errors:
@@ -170,9 +198,14 @@ def validate_catalog(catalog: dict, schema: dict) -> None:
         detail = load_json(detail_path)
         referenced_game_paths.add(detail_path.resolve())
         validate_game_detail(detail, schema, entry, entry_path, detail_path)
-        players = entry["players"]
-        if players.get("max") is not None and players["max"] < players["min"]:
-            fail(f"{entry_path}.players", "max must be greater than or equal to min")
+        if "compositionFormats" in entry:
+            _validate_composition_formats(
+                entry["compositionFormats"], field=f"{entry_path}.compositionFormats"
+            )
+        else:
+            players = entry["players"]
+            if players.get("max") is not None and players["max"] < players["min"]:
+                fail(f"{entry_path}.players", "max must be greater than or equal to min")
 
         if "image" in entry:
             referenced_image_paths.add(
@@ -214,15 +247,36 @@ def validate_game_detail(
     relative = str(detail_path.relative_to(ROOT))
     if detail["id"] != entry["id"]:
         fail(relative, f"id {detail['id']!r} does not match index id {entry['id']!r}")
-    for key in ("name", "players", "playMode", "requiredCapabilities", "minimumAge", "icon", "image"):
+    for key in ("name", "requiredCapabilities", "minimumAge", "icon", "image"):
         if entry.get(key) != detail.get(key):
             fail(
                 relative,
                 f"{key} does not match catalog index: index={entry.get(key)!r}, detail={detail.get(key)!r}",
             )
-    players = detail["players"]
-    if players.get("max") is not None and players["max"] < players["min"]:
-        fail(f"{relative}.players", "max must be greater than or equal to min")
+    if "compositionFormats" in entry:
+        if "players" in detail or "playMode" in detail:
+            fail(relative, "format participation must not declare players or playMode")
+        index_formats = _validate_composition_formats(
+            entry["compositionFormats"], field="catalog.json.compositionFormats"
+        )
+        detail_formats = _validate_composition_formats(
+            detail["compositionFormats"], field=f"{relative}.compositionFormats"
+        )
+        if index_formats != detail_formats:
+            fail(
+                relative,
+                f"compositionFormats does not match catalog index: index={index_formats!r}, detail={detail_formats!r}",
+            )
+    else:
+        for key in ("players", "playMode"):
+            if entry.get(key) != detail.get(key):
+                fail(
+                    relative,
+                    f"{key} does not match catalog index: index={entry.get(key)!r}, detail={detail.get(key)!r}",
+                )
+        players = detail["players"]
+        if players.get("max") is not None and players["max"] < players["min"]:
+            fail(f"{relative}.players", "max must be greater than or equal to min")
     capabilities = set(detail["requiredCapabilities"])
     rules = detail["gameRules"]
     if rules["type"] == "standard":

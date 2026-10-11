@@ -6,7 +6,7 @@
   "additionalProperties": false,
   "required": ["schemaVersion", "catalogVersion", "language", "games"],
   "properties": {
-    "schemaVersion": {"const": 2},
+    "schemaVersion": {"const": 3},
     "catalogVersion": {"type": "string", "minLength": 1},
     "language": {"const": "fr"},
     "games": {
@@ -210,29 +210,52 @@
       "properties": {"type": {"const": "declarative"}, "definition": {"$ref": "#/$defs/declarativeDefinition"}, "presentation": {"$ref": "#/$defs/presentation"}}
     },
     "gameRules": {"oneOf": [{"$ref": "#/$defs/standardRules"}, {"$ref": "#/$defs/declarativeRules"}]},
+    "compositionFormat": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "label", "campCount", "playersPerCamp"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "label": {"type": "string", "minLength": 1},
+        "campCount": {"type": "integer", "minimum": 2},
+        "playersPerCamp": {"type": "integer", "minimum": 1}
+      }
+    },
+    "compositionFormats": {
+      "type": "array", "minItems": 1,
+      "items": {"$ref": "#/$defs/compositionFormat"}
+    },
     "gameIndex": {
       "type": "object", "additionalProperties": false,
-      "required": ["id", "name", "path", "players", "playMode", "requiredCapabilities"],
+      "required": ["id", "name", "path", "requiredCapabilities"],
       "properties": {
         "id": {"$ref": "#/$defs/id"}, "name": {"type": "string", "minLength": 1},
         "path": {"type": "string", "pattern": "^games/[a-z0-9]+(?:-[a-z0-9]+)*\\.json$"},
         "players": {"$ref": "#/$defs/players"}, "playMode": {"enum": ["individual", "teams"]},
+        "compositionFormats": {"$ref": "#/$defs/compositionFormats"},
         "requiredCapabilities": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
         "icon": {"type": "string", "minLength": 1},
         "image": {"type": "string", "pattern": "^images/[a-z0-9]+(?:-[a-z0-9]+)*\\.webp$"},
         "minimumAge": {"type": "integer", "minimum": 1}
-      }
+      },
+      "oneOf": [
+        {"required": ["players", "playMode"], "not": {"required": ["compositionFormats"]}},
+        {"required": ["compositionFormats"], "not": {"anyOf": [{"required": ["players"]}, {"required": ["playMode"]}]}}
+      ]
     },
     "gameDetail": {
       "type": "object", "additionalProperties": false,
-      "required": ["schemaVersion", "id", "name", "players", "playMode", "requiredCapabilities", "gameRules"],
+      "required": ["schemaVersion", "id", "name", "requiredCapabilities", "gameRules"],
       "properties": {
-        "schemaVersion": {"const": 2},
+        "schemaVersion": {"enum": [2, 3]},
         "id": {"$ref": "#/$defs/id"}, "name": {"type": "string", "minLength": 1}, "players": {"$ref": "#/$defs/players"},
-        "playMode": {"enum": ["individual", "teams"]}, "requiredCapabilities": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "playMode": {"enum": ["individual", "teams"]}, "compositionFormats": {"$ref": "#/$defs/compositionFormats"}, "requiredCapabilities": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
         "gameRules": {"$ref": "#/$defs/gameRules"}, "icon": {"type": "string", "minLength": 1},
         "image": {"type": "string", "pattern": "^images/[a-z0-9]+(?:-[a-z0-9]+)*\\.webp$"}, "minimumAge": {"type": "integer", "minimum": 1}, "rules": {"type": "string", "minLength": 1}
-      }
+      },
+      "oneOf": [
+        {"required": ["players", "playMode"], "not": {"required": ["compositionFormats"]}},
+        {"required": ["schemaVersion", "compositionFormats"], "properties": {"schemaVersion": {"const": 3}}, "not": {"anyOf": [{"required": ["players"]}, {"required": ["playMode"]}]}}
+      ]
     }
   }
 }
